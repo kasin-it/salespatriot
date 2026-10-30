@@ -3,7 +3,9 @@ import { audit } from "../lib/audit.ts";
 import { errorMessage, now, sleep } from "../lib/util.ts";
 import { CATEGORY_BY_KEY, classifyText } from "../lib/taxonomy.ts";
 import { mailboxReady, readAgentEmail, sendAgentEmail, withBlock } from "./mailneg.ts";
-import { addStep, getDemoConfig, parseRequest, profileFor, setMission, specificTokens } from "./mission.ts";
+import { addStep, getDemoConfig, parseRequest, profileFor, rankEvents, setMission, specificTokens } from "./mission.ts";
+import { onboardCompany } from "./onboarding.ts";
+import { think } from "./think.ts";
 import { demandForCategory } from "./demand.ts";
 import type { TaskContext } from "../agents/orchestrator.ts";
 
@@ -49,6 +51,28 @@ export function publicKnowledge(companyId: number): { known: string[]; unknown: 
   if (certs) known.push(`Certification mentions: ${certs}`); else unknown.push("Certifications");
   unknown.push("Who will attend the event", "What they will show", "Price and lead time");
   return { known, unknown, thin: known.length <= 3 };
+}
+
+/**
+ * First-run convenience: when nobody has entered a supplier-agent profile, the operator's OWN demo company gets a starter profile
+ * (clearly labelled in the UI as a demo supplier; editable under Missions → Scenario 3). Event and meeting slots come from real event data;
+ * the people and what they bring are placeholders the operator can replace.
+ */
+export function ensureDemoSupplier(userId: number, product: string, categoryKey: string, deadline: string | null): { profile: SupplierProfile; created: boolean } | null {
+  const db = getDb();
+  const name = "Skyhawk Defence (demo startup)";
+  let co = db.get<{ id: number }>("SELECT c.id FROM companies c JOIN company_memberships m ON m.company_id=c.id WHERE m.user_id=? AND c.canonical_name=?", userId, name);
+  if (!co) co = { id: onboardCompany({ userId, legalName: name, country: "PL", authorizationLevel: "SIGNATORY", jobTitle: "Demo operator" }).companyId };
+  const ranked = rankEvents(categoryKey, deadline, specificTokens(product)).filter((r) => r.startDate);
+  const ev = ranked[0] ?? rankEvents(categoryKey, deadline)[0];
+  if (!ev) return null;
+  const day1 = ev.startDate!, day2 = ev.endDate && ev.endDate > ev.startDate! ? new Date(Date.parse(ev.startDate!) + 86400_000).toISOString().slice(0, 10) : ev.startDate!;
+  saveProfile(co.id, { event_id: ev.eventId, own_company: 1, focus: product, stand: "stand assigned on arrival", days_present: `${day1}${day2 !== day1 ? ` – ${day2}` : ""}`,
+    attendees: [{ name: "Anna Nowak", role: "CEO" }, { name: "Piotr Zieliński", role: "CTO" }], bringing: ["Working prototype (demo unit)", "Live demonstration screen"],
+    shareable: [`Company focus: ${product}`, "Prototype tested in field trials (TRL 6)"],
+    gated: [{ topic: "Technical specification", how: "under NDA, on site" }, { topic: "Pricing and lead time", how: "given on site only" }, { topic: "Export licence status", how: "discussed in person" }],
+    meeting_slots: [`${day1}, 14:00`, `${day2}, 10:30`] }, userId);
+  return { profile: loadProfile(co.id)!, created: true };
 }
 
 // ---- Message builders (pure; exported for tests) -------------------------------------------------------------
@@ -116,11 +140,11 @@ export function buyerConfirm(c: Ctx, slot: string | null, stand: string | null, 
 // ---- Mission --------------------------------------------------------------------------------------------------
 export interface Turn { n: number; from: "buyer" | "supplier"; subject: string; text: string; readBack: boolean; emailed: boolean }
 
-export async function runPreEventConversation(missionId: number, ctx: Ctx, profile: SupplierProfile): Promise<Turn[]> {
+export async function runPreEventConversation(missionId: number, ctx: Ctx, profile: SupplierProfile, opts: { tag?: string } = {}): Promise<Turn[]> {
   const pace = Number(process.env.PREEVENT_PACE_MS ?? 1500);
   const useMail = mailboxReady();
   const turns: Turn[] = [];
-  const base = `[PRE-${missionId}-`;
+  const base = `[PRE-${opts.tag ?? missionId}-`;
   const post = async (n: number, from: "buyer" | "supplier", subject: string, text: string, data: Record<string, unknown>): Promise<Record<string, unknown> | null> => {
     const body = withBlock(text, data);
     let readBack = false; let emailed = false; let parsed: Record<string, unknown> | null = data;
@@ -133,7 +157,7 @@ export async function runPreEventConversation(missionId: number, ctx: Ctx, profi
     }
     const turn: Turn = { n, from, subject: `${base}${n}] ${subject}`, text: body, readBack, emailed };
     turns.push(turn);
-    addStep(missionId, "mail", `${from === "buyer" ? "Buyer agent → Supplier agent" : "Supplier agent → Buyer agent"}: ${subject}`, "DONE", turn);
+    addStep(missionId, "mail", `${from === "buyer" ? "Buyer agent → Supplier agent" : "Supplier agent → Buyer agent"}: ${subject}`, "DONE", { ...turn, supplier: ctx.supplier });
     if (n < 5) await sleep(pace);
     return parsed;
   };
@@ -166,9 +190,14 @@ export async function runPreEventMission(ctx: TaskContext, missionId: number, op
     db.update("missions", missionId, { parsed: JSON.stringify(parsed) });
     const startup = /start-?up|early[- ]stage|scale-?up/i.test(m.prompt);
     addStep(missionId, "parse", `Understood: looking for ${startup ? "a startup building " : ""}${parsed.product}${parsed.categoryLabel ? ` → category “${parsed.categoryLabel}”` : ""}`, "DONE", { ...parsed });
+    await think(missionId, "How I read your request", { request: m.prompt, product: parsed.product, category: parsed.categoryLabel, startupFocus: startup, quantity: parsed.quantity, deadline: parsed.deadline },
+      `You want ${startup ? "a startup" : "a supplier"} working on ${parsed.product}${parsed.quantity ? ` (${parsed.quantity} units)` : ""}. I mapped that to “${parsed.categoryLabel ?? "no category"}”. A startup usually publishes little, so I expect some information to be gated.`);
     if (!parsed.categoryKey) return fail("I could not map this request to a product category. Name the technology (e.g. counter-drone interceptors).");
     const demand = demandForCategory(parsed.categoryKey, { specific: specificTokens(parsed.product), limit: 4 });
     addStep(missionId, "demand", `Real demand: ${demand.totals.open} open tenders for “${parsed.categoryLabel}”`, "DONE", demand);
+
+    await think(missionId, "What the tenders tell me", { openTenders: demand.totals.open, recentAwards: demand.totals.awards, topOpen: demand.open.slice(0, 3).map((n) => ({ title: n.title, authority: n.authority, country: n.country })), caveat: "A tender shows public demand, not that anyone wants to trade with us" },
+      `There are ${demand.totals.open} open tenders and ${demand.totals.awards} recent awards in this category, so the demand is real. That is context only: it does not mean any buyer wants to trade with us.`);
 
     // Candidate: explicit choice, or the best supplier-agent profile whose focus fits the requested category.
     let profile: SupplierProfile | undefined = opts.supplierCompanyId ? loadProfile(opts.supplierCompanyId) : undefined;
@@ -176,13 +205,17 @@ export async function runPreEventMission(ctx: TaskContext, missionId: number, op
       const all = db.all<{ company_id: number }>("SELECT company_id FROM supplier_profiles").map((r) => loadProfile(r.company_id)!).filter(Boolean);
       profile = all.find((p) => classifyText(`${p.focus} ${p.shareable.join(" ")}`).some((h) => h.key === parsed.categoryKey));
     }
-    if (!profile) return fail("No supplier agent is available for this technology. Add a supplier profile (who attends, what they bring) first.");
+    let demoSupplier = false;
+    if (!profile && m.user_id) { const made = ensureDemoSupplier(m.user_id, parsed.product, parsed.categoryKey, parsed.deadline); if (made) { profile = made.profile; demoSupplier = true; } }
+    if (!profile) return fail("No supplier agent is available and no researched event matches this technology yet.");
     const sup = db.get<{ canonical_name: string; country: string | null }>("SELECT canonical_name, country FROM companies WHERE id=?", profile.company_id)!;
     const ev = db.get<{ id: number; name: string; start_date: string | null; end_date: string | null }>("SELECT id, name, start_date, end_date FROM events WHERE id=?", profile.event_id ?? -1);
     if (!ev) return fail("The supplier profile has no event assigned.");
     const pk = publicKnowledge(profile.company_id);
     setMission(missionId, { event_id: ev.id, target_company_id: profile.company_id });
-    addStep(missionId, "candidate", `Candidate: ${sup.canonical_name} — ${pk.thin ? "public information is THIN (gated); I will ask their agent" : "some public information available"}`, "DONE", { supplier: sup.canonical_name, own: !!profile.own_company, event: ev.name, known: pk.known, unknown: pk.unknown, simulated: !profile.own_company });
+    addStep(missionId, "candidate", `Candidate: ${sup.canonical_name} — ${pk.thin ? "public information is THIN (gated); I will ask their agent" : "some public information available"}`, "DONE", { supplier: sup.canonical_name, own: !!profile.own_company, event: ev.name, known: pk.known, unknown: pk.unknown, simulated: !profile.own_company, demoSupplier });
+    await think(missionId, "Why I'm asking their agent", { candidate: sup.canonical_name, event: ev.name, publiclyKnown: pk.known, notPublic: pk.unknown, publicInfoIsThin: pk.thin },
+      `I know very little about ${sup.canonical_name} from public sources: ${pk.known.length ? pk.known.slice(0, 2).join("; ") : "only the name"}. Instead of guessing what they build or who will attend ${ev.name}, I will ask their agent directly and keep everything unanswered marked as unknown.`);
     const buyer = db.get<{ canonical_name: string }>("SELECT canonical_name FROM companies WHERE id=?", m.company_id)!;
     const dates = ev.start_date ? `${ev.start_date}${ev.end_date && ev.end_date !== ev.start_date ? ` – ${ev.end_date}` : ""}` : null;
     const c: Ctx = { buyer: buyer.canonical_name, supplier: sup.canonical_name, event: ev.name, dates, product: parsed.product, quantity: parsed.quantity, deadline: parsed.deadline, startup, known: pk.known.slice(0, 3), deliveryLocation: cfg.deliveryLocation };
@@ -191,6 +224,8 @@ export async function runPreEventMission(ctx: TaskContext, missionId: number, op
     const gated = profile.gated.map((g) => g.topic);
     const slot = profile.meeting_slots[0] ?? null;
     addStep(missionId, "meeting", `Meeting agreed: ${sup.canonical_name}${slot ? ` — ${slot}` : ""}${profile.stand ? `, ${profile.stand}` : ""}`, "DONE", { supplier: sup.canonical_name, supplierCompanyId: profile.company_id, event: ev.name, eventId: ev.id, slot, stand: profile.stand, attendee: profile.attendees[0] ?? null, bringing: profile.bringing, knownNow: profile.shareable, onSiteOnly: profile.gated, emails: turns.length });
+    await think(missionId, "What the conversation gave me", { supplier: sup.canonical_name, meeting: slot, stand: profile.stand, attendee: profile.attendees[0]?.name ?? null, learnedByEmail: profile.shareable, onlyOnSite: gated, emailsExchanged: turns.length },
+      `After ${turns.length} emails I know who will be there${profile.attendees[0] ? ` (${profile.attendees[0].name})` : ""}, when we meet${slot ? ` (${slot})` : ""}, and what they will bring. ${gated.length ? `${gated.join(", ")} stay gated until we are on site, so I turn them into a checklist for your person.` : ""}`);
     setMission(missionId, { status: "MEETING_PLANNED" });
     audit({ actorType: "agent", actorId: "buyer_agent", companyId: m.company_id, action: "preevent.meeting_planned", entityType: "mission", entityId: missionId, summary: `Pre-event conversation with ${sup.canonical_name} finished in ${turns.length} emails; ${gated.length} gated topic(s) deferred to the event` });
     return { status: "MEETING_PLANNED" };

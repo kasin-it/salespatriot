@@ -11,9 +11,10 @@ import { indexEvent } from "../services/search.ts";
 import { syncTed, TED_FILTERS } from "../connectors/ted.ts";
 import { syncEzamowienia } from "../connectors/ezamowienia.ts";
 import { extractorFor } from "../connectors/exhibitors.ts";
-import { buildBriefing, pollInbox, sendFieldRequest, mailpitUrl } from "../services/field.ts";
+import { buildBriefing, pollInbox, sendDebrief, sendFieldRequest, mailpitUrl } from "../services/field.ts";
 import { runPreEventMission } from "../services/preevent.ts";
 import { think } from "../services/think.ts";
+import { investigate } from "../services/campaign.ts";
 import { addStep, runFieldMission, runMission, setMission } from "../services/mission.ts";
 import { runAutopilot } from "../services/autopilot.ts";
 import { NeedsApproval, acceptOffer, currentOffer, getNegotiation, policyFor, requestApproval, submitOffer } from "../services/negotiation.ts";
@@ -172,12 +173,14 @@ export function registerAllHandlers(): void {
       addStep(fr.mission_id, "briefing", `Briefing: ${briefing.fit.priceVsMandate}; ${briefing.matchedNotices.length} matching open tender(s)`, "DONE", briefing);
       await think(fr.mission_id, "What the salesperson's material tells me", { terms: sum.terms, gaps: sum.gaps, photos: sum.photoCount ?? 0, mandate: briefing.buyerMandate ? { maxUnitPrice: briefing.buyerMandate.maxUnitPrice, currency: briefing.buyerMandate.currency, maxLeadTimeDays: briefing.buyerMandate.maxLeadTimeDays } : null, fit: briefing.fit },
         `From the photo and documents I could read: ${Object.entries(sum.terms).map(([k, v]) => `${k} ${String(v)}`).join(", ") || "no commercial terms"}. ${briefing.fit.priceVsMandate}. ${sum.gaps.length ? `I will not guess the gaps: ${sum.gaps.join(", ")}.` : ""}`);
+      if (await sendDebrief(reqId)) addStep(fr.mission_id, "debrief", "Wrote back to the salesperson with what is still missing", "DONE");
       if (startAutopilot) { setMission(fr.mission_id, { status: "NEGOTIATING", negotiation_id: startAutopilot.negotiationId }); addStep(fr.mission_id, "negotiate", "Buyer and supplier agents are negotiating by email…", "ACTIVE"); }
       else addStep(fr.mission_id, "negotiate", briefing.negotiation.decision, "ERROR");
     }
     if (startAutopilot) ctx.spawn("negotiation", "negotiation.autopilot", { negotiationId: startAutopilot.negotiationId, rfqTerms: startAutopilot.rfqTerms }, { dedupeKey: `autopilot:${startAutopilot.negotiationId}`, priority: 1 });
     return briefing;
   });
+  registerHandler("campaign.investigate", async (ctx) => investigate(ctx, num(ctx.payload.missionId, "missionId")));
   registerHandler("mission.run", async (ctx) => {
     const id = num(ctx.payload.missionId, "missionId");
     const f = ctx.payload.field as { eventId: number; targetCompanyId: number; standHint: string | null; quantity: number | null; profile?: "default" | "drone" } | undefined;

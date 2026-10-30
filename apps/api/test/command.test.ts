@@ -39,3 +39,26 @@ test("command center: empty state is zeros; counts come from stored rows only", 
   assert.equal(d.missions.length, 0, "archived missions are hidden");
   assert.equal(d.kpis.agentEmails, 0, "and so are their emails");
 });
+
+test("event preview refuses unknown products and field-events lists only events with missions", async () => {
+  const db = freshDb();
+  const app = new Hono().route("/api", api);
+  registerUser("p@t.example", "P", "correct-horse-1");
+  const tok = login("p@t.example", "correct-horse-1").token;
+  const u = db.get<{ id: number }>("SELECT id FROM users")!.id;
+  const co = fixtureCompany(db, "Buyer Test Co", { registered: true, userId: u });
+  const call = (path: string, init?: RequestInit) => app.request(`/api${path}`, { ...init, headers: { authorization: `Bearer ${tok}`, "content-type": "application/json" } });
+  const bad = await call("/events-preview", { method: "POST", body: JSON.stringify({ prompt: "Find me events with bakery equipment please" }) });
+  assert.equal(bad.status, 422);
+  assert.deepEqual(await (await call("/field-events")).json(), []);
+  const ev = db.insert("events", { name: "Test Expo", official_url: "https://expo.test", discovered_via: "USER_URL" });
+  const rep = db.insert("field_reps", { company_id: co, name: "Rep One", email: "rep@t.example" });
+  const mid = db.insert("missions", { company_id: co, kind: "SOURCING", prompt: "x", status: "WAITING_REPLY", event_id: ev });
+  db.insert("field_requests", { company_id: co, rep_id: rep, event_id: ev, token: "ARS-T1", subject: "s", body: "b", mode: "SMTP", status: "REQUESTED", mission_id: mid });
+  db.update("missions", mid, { field_request_id: 1 });
+  logAgentEmail({ kind: "field_request", from: "agent@arsenal.test", to: "rep@t.example", subject: "Jesteś na evencie? [ARS-T1]", body: "hello" });
+  const list = (await (await call("/field-events")).json()) as { name: string; people: { name: string }[]; emails: number }[];
+  assert.equal(list.length, 1); assert.equal(list[0]!.people[0]!.name, "Rep One"); assert.equal(list[0]!.emails, 1);
+  const detail = (await (await call(`/field-events/${ev}`)).json()) as { people: unknown[]; log: { type: string }[] };
+  assert.equal(detail.people.length, 1); assert.ok(detail.log.some((l) => l.type === "email"));
+});

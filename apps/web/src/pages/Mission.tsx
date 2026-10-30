@@ -11,16 +11,17 @@ function Dot({ status }: { status: string }) {
   return <Marker tone={status === "DONE" ? "ok" : status === "ERROR" ? "error" : status === "WAITING" ? "wait" : "active"} pulse={status !== "DONE" && status !== "ERROR"} />;
 }
 
-function Thought({ step }: { step: Row }) {
+export function Thought({ step, big }: { step: Row; big?: boolean }) {
   const d = step.detail as Row;
   const text = String(d.text ?? "");
-  const fresh = Date.now() - Date.parse(String(step.created_at)) < 20000;
+  const fresh = Date.now() - Date.parse(String(step.created_at)) < 25000;
   const [n, setN] = useState(fresh ? 0 : text.length);
-  useEffect(() => { if (n >= text.length) return; const t = setTimeout(() => setN((x) => Math.min(text.length, x + 2)), 16); return () => clearTimeout(t); }, [n, text.length]);
+  useEffect(() => { if (n >= text.length) return; const t = setTimeout(() => setN((x) => Math.min(text.length, x + 2)), 14); return () => clearTimeout(t); }, [n, text.length]);
+  const typing = n < text.length;
   return (
-    <div className="border-l-2 border-accent bg-mist p-3">
-      <div className="ds-cap mb-1 flex flex-wrap items-center gap-2"><span>{step.title}</span><Badge value={d.by === "LLM" ? "AI REASONING · NUMBERS VERIFIED" : "RULE-BASED REASONING"} tone={d.by === "LLM" ? "violet" : "grey"} />{d.note && <span className="normal-case">{d.note}</span>}</div>
-      <p className="m-0 text-[13px] italic leading-relaxed text-ink">{text.slice(0, n)}{n < text.length && <span className="animate-pulse">▍</span>}</p>
+    <div className={`border-l-4 border-accent bg-mist ${big ? "p-4" : "p-3"}`}>
+      <div className="ds-cap mb-2 flex flex-wrap items-center gap-2"><span className="text-accent">🧠 {step.title}</span><Badge value={d.by === "LLM" ? "AI REASONING · NUMBERS VERIFIED" : "RULE-BASED REASONING"} tone={d.by === "LLM" ? "violet" : "grey"} />{d.note && <span className="normal-case text-muted">{d.note}</span>}</div>
+      <p className={`m-0 leading-relaxed text-ink ${big ? "text-[16px]" : "text-[13px]"}`}>{text.slice(0, n)}{typing && <span className="animate-pulse text-accent">▍</span>}</p>
     </div>
   );
 }
@@ -71,7 +72,7 @@ function Detail({ step, data, missionId, onContinue }: { step: Row; data: Row; m
   if (step.kind === "candidate" && d) return <CandidateCard d={d} />;
   if (step.kind === "mail" && d) return <MailBubble t={d} />;
   if (step.kind === "meeting" && d) return <MeetingCard d={d} missionId={missionId} onContinue={onContinue} />;
-  if (step.kind === "parse" && d) return <div className="flex flex-wrap gap-2 text-xs"><Badge value={`${d.quantity ?? "?"} units`} tone="blue" /><Badge value={d.product} tone="blue" /><Badge value={d.categoryLabel ?? "no category"} tone="violet" />{d.deadline && <Badge value={`deadline ${d.deadline}`} tone="amber" />}<Badge value={`parsed by ${d.parsedBy}`} tone="grey" />{d.note && <span className="text-muted">{d.note}</span>}</div>;
+  if (step.kind === "parse" && d) return <div className="flex flex-wrap gap-2 text-xs">{d.quantity != null && <Badge value={`${d.quantity} units`} tone="blue" />}<Badge value={d.product} tone="blue" /><Badge value={d.categoryLabel ?? "no category"} tone="violet" />{d.deadline && <Badge value={`deadline ${d.deadline}`} tone="amber" />}<Badge value={`parsed by ${d.parsedBy}`} tone="grey" />{d.note && <span className="text-muted">{d.note}</span>}</div>;
   if (step.kind === "demand" && d) {
     const tender = (n: Row) => <li key={n.id} className="border border-edge px-3 py-2"><a className="font-medium text-accent underline-offset-2 hover:underline hover:text-accent" href={n.url} target="_blank" rel="noreferrer noopener">{String(n.title ?? "notice").slice(0, 110)}</a><div className="text-[11px] text-muted">{n.authority ?? "authority unknown"} · {n.country ?? "?"} · published {n.publicationDate ?? "?"}{n.deadline ? ` · deadline ${String(n.deadline).slice(0, 10)}` : " · deadline not published"} · <Badge value={n.demandClass} /></div></li>;
     return <div className="grid gap-4 lg:grid-cols-2"><div><Cap>Open tenders ({d.totals.open})</Cap><ul className="space-y-1.5">{(d.open as Row[]).map(tender)}</ul>{!(d.open as Row[]).length && <div className="text-xs text-muted">None currently open.</div>}</div><div><Cap>Recent awards — historical, not current demand ({d.totals.awards})</Cap><ul className="space-y-1.5">{(d.awards as Row[]).slice(0, 3).map(tender)}</ul></div></div>;
@@ -103,7 +104,7 @@ function MailPanel({ missionId, mailpitUrl, active }: { missionId: number; mailp
   );
 }
 
-function DealBanner({ data }: { data: Row }) {
+export function DealBanner({ data }: { data: Row }) {
   const d = data.deal as Row;
   const open = async () => { const r = await fetch(`/api/deals/${d.id}/pdf`, { headers: { authorization: `Bearer ${getToken() ?? ""}` } }); window.open(URL.createObjectURL(await r.blob()), "_blank"); };
   const sandbox = d.mode === "SANDBOX";
@@ -123,7 +124,7 @@ function DealBanner({ data }: { data: Row }) {
   );
 }
 
-function RepPhone({ id, onSent }: { id: number; onSent: () => void }) {
+export function RepPhone({ id, onSent }: { id: number; onSent: () => void }) {
   const [files, setFiles] = useState<{ name: string; type: string; base64: string }[]>([]);
   const [note, setNote] = useState("Jestem przy stoisku. Zdjęcie i spec w załączniku.");
   const [msg, setMsg] = useState<string | null>(null);
@@ -149,6 +150,90 @@ function RepPhone({ id, onSent }: { id: number; onSent: () => void }) {
   );
 }
 
+const PHASES = [
+  { key: "understand", label: "Understand", hint: "what you asked for" },
+  { key: "market", label: "Read the market", hint: "real tenders" },
+  { key: "choose", label: "Choose", hint: "event, stands, supplier" },
+  { key: "contact", label: "Contact", hint: "emails & people" },
+  { key: "learn", label: "Learn on site", hint: "photo & spec" },
+  { key: "negotiate", label: "Negotiate", hint: "agent to agent" },
+  { key: "close", label: "Close", hint: "deal record" },
+] as const;
+const KIND_PHASE: Record<string, string> = { event_fit: "choose", candidates: "choose", supplier: "contact", supplier_context: "contact", verdict: "choose", dispatch: "contact", debrief: "learn", followup: "close", summary: "close", start: "understand", parse: "understand", demand: "market", rank: "choose", choose: "choose", plan: "choose", candidate: "choose", email: "contact", wait: "contact", mail: "contact", meeting: "contact", extract: "learn", briefing: "learn", negotiate: "negotiate", rounds: "negotiate", deal: "close" };
+const THINK_PHASE: Record<string, string> = { "How I read your request": "understand", "What the tenders tell me": "market", "Why this event": "choose", "Why these stands": "choose", "Why I'm asking their agent": "choose", "What the conversation gave me": "contact", "What the salesperson's material tells me": "learn", "How the negotiation went": "negotiate" };
+const OPEN_KINDS = ["mail", "meeting", "extract", "candidate", "deal", "rounds"];
+
+function PhaseRail({ states }: { states: Record<string, "done" | "active" | "error" | "pending"> }) {
+  return (
+    <div className="mb-5 grid grid-cols-7 gap-1">
+      {PHASES.map((p, i) => {
+        const st = states[p.key] ?? "pending";
+        return (
+          <div key={p.key} className={`border-t-2 pt-2 ${st === "pending" ? "border-edge" : st === "error" ? "border-alert" : st === "active" ? "border-accent" : "border-ink"}`}>
+            <div className="flex items-center gap-1.5"><Marker tone={st === "done" ? "ok" : st === "error" ? "error" : st === "active" ? "active" : "wait"} pulse={st === "active"} /><span className="font-mono text-[10px] text-muted">0{i + 1}</span></div>
+            <div className={`mt-0.5 text-[12px] font-semibold leading-tight ${st === "pending" ? "text-faint" : "text-ink"}`}>{p.label}</div>
+            <div className="hidden text-[10px] text-muted md:block">{p.hint}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export function ReasoningTrace({ steps, data, missionId, onContinue, status }: { steps: Row[]; data: Row; missionId: number; onContinue: (id: number) => void; status: string | undefined }) {
+  const groups: { key: string; thoughts: Row[]; actions: Row[] }[] = [];
+  let last = "understand";
+  for (const s of steps) {
+    const key = s.kind === "think" ? THINK_PHASE[s.title as string] ?? last : s.kind === "error" ? last : KIND_PHASE[s.kind as string] ?? last;
+    last = key;
+    let g = groups.find((x) => x.key === key);
+    if (!g) { g = { key, thoughts: [], actions: [] }; groups.push(g); }
+    (s.kind === "think" ? g.thoughts : g.actions).push(s);
+  }
+  const terminal = !!status && TERMINAL.includes(status);
+  const lastKey = groups.at(-1)?.key;
+  const failed = status === "FAILED" || status === "NO_AGREEMENT" || status === "ESCALATED";
+  const states: Record<string, "done" | "active" | "error" | "pending"> = {};
+  for (const g of groups) states[g.key] = g.key === lastKey ? (failed ? "error" : terminal ? "done" : "active") : "done";
+  return (
+    <div>
+      <PhaseRail states={states} />
+      <div className="space-y-6">
+        {groups.map((g) => {
+          const ph = PHASES.find((p) => p.key === g.key)!;
+          const idx = PHASES.findIndex((p) => p.key === g.key) + 1;
+          const isActive = g.key === lastKey && !terminal;
+          return (
+            <section key={g.key} className="ds-reveal">
+              <header className="mb-2 flex items-center gap-2"><span className="font-mono text-[11px] text-accent">0{idx}</span><h3 className="ds-label m-0">{ph.label}</h3><span className="h-px flex-1 bg-edge" /></header>
+              <div className="space-y-3">
+                {g.thoughts.map((t) => <Thought key={String(t.id)} step={t} big />)}
+                {g.actions.map((a) => {
+                  const hasDetail = !!a.detail && a.kind !== "start";
+                  const open = isActive || OPEN_KINDS.includes(a.kind as string);
+                  return (
+                    <div key={String(a.id)} className="pl-1">
+                      <div className="flex items-start gap-2"><span className="mt-1.5"><Dot status={a.status as string} /></span>
+                        <div className="min-w-0 flex-1"><div className={`text-[13px] ${a.status === "ERROR" ? "font-semibold text-alert" : "text-ink"}`}>{a.title}</div></div>
+                        <div className="shrink-0 font-mono text-[10px] text-muted">{fmtTime(a.created_at as string)?.split(", ")[1]}</div></div>
+                      {hasDetail && (
+                        <details open={open} className="group ml-5 mt-1">
+                          <summary className="ds-cap cursor-pointer select-none list-none py-1 text-muted hover:text-accent">▸ Evidence</summary>
+                          <div className="pb-2 pt-1"><Detail step={a} data={data} missionId={missionId} onContinue={onContinue} /></div>
+                        </details>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function MissionView({ id, onContinue }: { id: number; onContinue: (id: number) => void }) {
   const [live, setLive] = useState(true);
   const m = useApi<Row>(`/missions/${id}`, live ? 1500 : 0);
@@ -162,19 +247,10 @@ function MissionView({ id, onContinue }: { id: number; onContinue: (id: number) 
   return (
     <div className="grid gap-5 xl:grid-cols-[1fr_380px]">
       <div className="space-y-4">
+        {m.data.mission.event_id ? <div className="flex items-center justify-between border border-edge bg-paper px-3 py-2 text-[12px]"><span className="text-muted">This run belongs to an event</span><Link className="text-accent underline-offset-2 hover:underline" to={`/field-events/${m.data.mission.event_id}`}>Open the event log — who is there, every email ›</Link></div> : null}
         {m.data.deal && <DealBanner data={m.data} />}
-        <Card title={<span>Agent timeline <Badge value={status} /></span>}>
-          <ol className="relative space-y-4 border-l border-edge pl-6">
-            {steps.map((s) => s.kind === "think" ? (
-              <li key={s.id} className="ds-reveal relative"><span className="absolute -left-[29px] top-3 flex"><Marker tone="active" /></span><Thought step={s} /></li>
-            ) : (
-              <li key={s.id} className="ds-reveal relative">
-                <span className="absolute -left-[29px] top-2 flex"><Dot status={s.status} /></span>
-                <div className="flex items-baseline justify-between gap-3"><div className={`font-medium ${s.status === "ERROR" ? "text-alert" : ""}`}>{s.title}</div><div className="shrink-0 font-mono text-[11px] text-muted">{fmtTime(s.created_at)?.split(", ")[1]}</div></div>
-                <div className="mt-2"><Detail step={s} data={m.data!} missionId={id} onContinue={onContinue} /></div>
-              </li>
-            ))}
-          </ol>
+        <Card title={<span>How the agent thinks <Badge value={status} /></span>}>
+          <ReasoningTrace steps={steps} data={m.data} missionId={id} onContinue={onContinue} status={status} />
           <div ref={end} />
         </Card>
       </div>
@@ -230,72 +306,23 @@ function Setup({ onDone, setup }: { onDone: () => void; setup: Row }) {
 
 export function Mission() {
   const setup = useApi<Row>("/demo/setup", 8000);
-  const missions = useApi<Row[]>("/missions", 5000);
-  const chips = useApi<string[]>("/demo/suggestions");
-  const [prompt, setPrompt] = useState("Find me events where I can source 200 thermal cameras by Q1.");
-  const [mode, setMode] = useState<"S1" | "S2" | "S3">("S1");
-  const [prompt3, setPrompt3] = useState("Find me a war-tech startup that builds autonomous counter-drone interceptors.");
-  const chips3 = useApi<string[]>("/demo/suggestions-preevent");
-  const profiles3 = useApi<Row[]>("/preevent/profiles", 0);
-  const [supplier3, setSupplier3] = useState("");
+  const missions = useApi<Row[]>("/missions", 4000);
   const [sp] = useSearchParams();
   const [sel, setSel] = useState<number | null>(Number(sp.get("open")) || null);
   useEffect(() => { const o = Number(sp.get("open")); if (o) setSel(o); }, [sp]);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
   const [showSetup, setShowSetup] = useState(false);
-  const [f2, setF2] = useState({ eventId: "", company: "", quantity: "200", q: "", profile: "default" });
-  const ev = f2.eventId ? f2.eventId : "";
-  const exh = useApi<Row>(ev ? `/events/${ev}/exhibitors?limit=100${f2.q ? `&q=${encodeURIComponent(f2.q)}` : ""}` : null);
   const s = setup.data;
-  // A live demo starts on a clean prompt screen; earlier runs stay reachable below.
-  const current = sel;
-  const start = async (body: Row) => { setBusy(true); setErr(null); try { const r = await api<Row>("/missions", { body }); setSel(r.id); missions.reload(); } catch (e) { setErr((e as Error).message); } finally { setBusy(false); } };
-  const chip = (ok: boolean | undefined, label: string) => <span className={`ds-tag ds-tag--outline inline-flex items-center gap-1.5 normal-case ${ok ? "" : "text-muted"}`}><Marker tone={ok ? "ok" : "wait"} />{label}</span>;
+  const chip = (ok: boolean | undefined, label: string) => <Badge value={`${ok ? "● " : "○ "}${label}`} tone={ok ? "green" : "amber"} />;
   return (
     <div className="space-y-5">
       <Link to="/" className="text-xs text-muted hover:text-accent">← Command Center</Link>
-      <PageHead title="Missions" sub="From a sentence to a closed deal — real events, real exhibitors, negotiation by email, no human in the loop." actions={<>{chip(s?.status.mailpitReachable, "Mailpit")}{chip(s?.status.vision, "Photo reading")}{chip(s?.status.llm, "LLM")}{chip(s?.ready, "Setup")}<Btn onClick={() => setShowSetup(!showSetup)}>{showSetup ? "Hide setup" : "Setup"}</Btn></>} />
+      <PageHead title="Missions" sub="The reasoning behind every run. New runs start from the Command Center."
+        actions={<>{chip(s?.status.mailpitReachable, "Mailpit")}{chip(s?.status.vision, "Photo reading")}{chip(s?.status.llm, "LLM")}{chip(s?.ready, "Setup")}<Btn onClick={() => setShowSetup(!showSetup)}>{showSetup ? "Hide setup" : "Setup"}</Btn></>} />
       {s && (!s.ready || showSetup) && <Setup setup={s} onDone={() => { setup.reload(); setShowSetup(false); }} />}
-      {s && s.events.some((e: Row) => e.pending > 0) && <Notice>Event research is still reading exhibitor profiles in the background: {s.events.map((e: Row) => `${e.name}: ${e.exhibitors - e.pending}/${e.exhibitors}`).join(" · ")}. Rankings use what has been read so far.</Notice>}
-      <Card>
-        <div className="mb-3 flex flex-wrap gap-2">{([["S3", "Scenario 3 — Before the event"], ["S1", "Scenario 1 — Source a product"], ["S2", "Scenario 2 — I'm at the event"]] as const).map(([k, l]) => <Seg key={k} active={mode === k} onClick={() => setMode(k)}>{l}</Seg>)}</div>
-        {mode === "S3" ? (
-          <div className="space-y-3">
-            <p className="text-sm text-muted">You do not know what the company really has — it is gated. The buyer agent emails the supplier agent to learn <b>who will be at the event, where, what they bring</b> and what is only available on site, then agrees a meeting.</p>
-            <div className="flex gap-2 whitespace-nowrap"><input className="!py-3 !text-base" value={prompt3} onChange={(e) => setPrompt3(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && prompt3.length > 7 && !busy) void start({ prompt: prompt3, preevent: { supplierCompanyId: supplier3 ? Number(supplier3) : undefined } }); }} /><Btn tone="primary" size="lg" disabled={busy || prompt3.length < 8 || !s?.status} onClick={() => void start({ prompt: prompt3, preevent: { supplierCompanyId: supplier3 ? Number(supplier3) : undefined } })}>{busy ? "Starting…" : "Start the agents"}</Btn></div>
-            <div className="flex flex-wrap items-center gap-2">{(chips3.data ?? []).map((c) => <Chip key={c} onClick={() => setPrompt3(c)}>{c}</Chip>)}
-              <span className="ml-auto flex items-center gap-2 text-xs text-muted">Supplier agent:<select className="!w-64" value={supplier3} onChange={(e) => setSupplier3(e.target.value)}><option value="">Auto — best profile for this technology</option>{(profiles3.data ?? []).map((p) => <option key={p.company_id} value={p.company_id}>{p.name} {p.is_registered ? "(my own company)" : "(simulated)"}</option>)}</select></span></div>
-            {(profiles3.data ?? []).length === 0 && <Notice tone="warn">No supplier agent profile yet — create one below.</Notice>}
-          </div>
-        ) : mode === "S1" ? (
-          <div className="space-y-3">
-            <div className="flex gap-2 whitespace-nowrap"><input className="!py-3 !text-base" value={prompt} onChange={(e) => setPrompt(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && prompt.length > 7 && !busy) void start({ prompt }); }} /><Btn tone="primary" size="lg" disabled={busy || prompt.length < 8 || !s?.ready} onClick={() => void start({ prompt })}>{busy ? "Starting…" : "Run agent"}</Btn></div>
-            <div className="flex flex-wrap gap-2">{(chips.data ?? []).map((c) => <Chip key={c} onClick={() => setPrompt(c)}>{c}</Chip>)}</div>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <p className="text-sm text-muted">You are standing at a stand. The agent emails your salesperson: “Jesteś na evencie? Sprawdź stoisko…” and asks for a photo, the spec and the presentation. Everything after their reply is automatic.</p>
-            <div className="grid gap-3 md:grid-cols-4">
-              <Field label="Event"><select value={f2.eventId} onChange={(e) => setF2({ ...f2, eventId: e.target.value, company: "" })}><option value="">Select…</option>{(s?.events ?? []).map((e: Row) => <option key={e.id} value={e.id}>{e.name}</option>)}</select></Field>
-              <div className="md:col-span-2"><Field label={`Stand / company${f2.q ? "" : " (type to search)"}`}><input className="mb-1" placeholder="Search exhibitor…" value={f2.q} onChange={(e) => setF2({ ...f2, q: e.target.value })} /><select value={f2.company} onChange={(e) => setF2({ ...f2, company: e.target.value })}><option value="">{ev ? "Select…" : "Choose an event first"}</option>{(exh.data?.rows as Row[] | undefined)?.filter((x) => x.company_id).map((x) => <option key={x.id} value={x.company_id}>{x.exhibitor_name}{x.booth ? ` — ${x.booth}` : ""}</option>)}</select></Field></div>
-              <div className="space-y-2"><Field label="Product type (picks the mandate)"><select value={f2.profile} onChange={(e) => setF2({ ...f2, profile: e.target.value })}><option value="default">Thermal camera / other</option><option value="drone">Military drone</option></select></Field><Field label="RFQ quantity"><input value={f2.quantity} onChange={(e) => setF2({ ...f2, quantity: e.target.value })} /></Field></div>
-            </div>
-            <Btn tone="primary" size="lg" disabled={busy || !f2.company || !s?.ready} onClick={() => void start({ field: { eventId: Number(f2.eventId), targetCompanyId: Number(f2.company), quantity: Number(f2.quantity) || null, profile: f2.profile } })}>Ask my salesperson</Btn>
-          </div>
-        )}
-        <div className="mt-2"><Err msg={err} /></div>
-      </Card>
-      {mode === "S3" && <ProfileEditor events={s?.events ?? []} onSaved={() => profiles3.reload()} />}
-      {current ? (
-        <>
-          <div className="flex items-center justify-between text-xs text-muted"><span className="font-mono">Mission #{current}</span><span className="flex gap-1">{(missions.data ?? []).slice(0, 6).map((x) => <Chip key={x.id} active={x.id === current} onClick={() => setSel(x.id)}>#{x.id}</Chip>)}</span></div>
-          <MissionView key={current} id={current} onContinue={(nid) => { setSel(nid); missions.reload(); }} />
-        </>
-      ) : (
-        <Empty>Run the agent to see its work here. <Link className="text-accent underline-offset-2 hover:underline hover:text-accent" to="/events">Events</Link> must be researched first.
-          {(missions.data ?? []).length > 0 && <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs"><span>Previous runs:</span><Chip onClick={() => void api("/missions/archive-all", { body: {} }).then(() => missions.reload())}>hide all</Chip>{(missions.data ?? []).slice(0, 8).map((x) => <Chip key={x.id} onClick={() => setSel(x.id)}>#{x.id} · {x.status.replace(/_/g, " ").toLowerCase()}</Chip>)}</div>}</Empty>
-      )}
+      {showSetup && <details className="border border-edge bg-paper p-3"><summary className="ds-cap cursor-pointer">Supplier agent profile (advanced)</summary><div className="mt-3"><ProfileEditor events={s?.events ?? []} onSaved={() => undefined} /></div></details>}
+      {(missions.data ?? []).length > 0 && <div className="flex flex-wrap items-center gap-2 text-xs"><span className="text-muted">Runs:</span>{(missions.data ?? []).slice(0, 10).map((x) => <Chip key={String(x.id)} active={x.id === sel} onClick={() => setSel(x.id as number)}>#{x.id} · {String(x.status).replace(/_/g, " ").toLowerCase()}</Chip>)}</div>}
+      {sel ? <MissionView key={sel} id={sel} onContinue={(nid) => { setSel(nid); missions.reload(); }} />
+        : <Empty>Pick a run above, or start a new one from the <Link className="text-accent underline-offset-2 hover:underline" to="/">Command Center</Link>.</Empty>}
     </div>
   );
 }

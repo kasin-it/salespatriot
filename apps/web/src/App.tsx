@@ -6,6 +6,8 @@ import type { Row } from "./types.ts";
 import { Overview } from "./pages/Overview.tsx";
 import { Mission } from "./pages/Mission.tsx";
 import { Command } from "./pages/Command.tsx";
+import { FieldEvent } from "./pages/FieldEvent.tsx";
+import { Campaign } from "./pages/Campaign.tsx";
 import { Events, EventDetail } from "./pages/Events.tsx";
 import { Companies, CompanyDetail } from "./pages/Companies.tsx";
 import { Procurement } from "./pages/Procurement.tsx";
@@ -88,6 +90,8 @@ function Shell({ onLogout }: { onLogout: () => void }) {
         <Routes>
           <Route path="/" element={<Command />} />
           <Route path="/missions" element={<Mission />} />
+          <Route path="/field-events/:id" element={<FieldEvent />} />
+          <Route path="/campaign/:id" element={<Campaign />} />
           <Route path="/overview" element={<Overview />} />
           <Route path="/events" element={<Events />} />
           <Route path="/events/:id" element={<EventDetail />} />

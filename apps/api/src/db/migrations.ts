@@ -974,4 +974,5 @@ CREATE TABLE agent_emails (
 CREATE INDEX idx_agent_emails_created ON agent_emails(created_at);
 `,
   },
+  { id: 10, name: "campaigns", sql: `ALTER TABLE missions ADD COLUMN parent_id INTEGER REFERENCES missions(id); ALTER TABLE missions ADD COLUMN report TEXT;` },
 ];

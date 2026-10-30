@@ -140,7 +140,7 @@ export function rankEvents(key: string, deadline: string | null, specific: strin
   return ranks.sort((a, b) => Number(b.fitsDeadline === true) - Number(a.fitsDeadline === true) || b.specific - a.specific || b.matching - a.matching);
 }
 
-export const planStands = (eventId: number, key: string, specific: string[] = []): StandCandidate[] => exhibitorsMatching(eventId, key, specific).filter((c) => c.companyId).slice(0, 3);
+export const planStands = (eventId: number, key: string, specific: string[] = [], n = 3): StandCandidate[] => exhibitorsMatching(eventId, key, specific).filter((c) => c.companyId).slice(0, n);
 
 // ---- Demo configuration -------------------------------------------------------------------------------
 export type Profile = "default" | "drone";
@@ -157,11 +157,6 @@ export function getDemoConfig(): DemoConfig {
   const g = (k: string) => json<unknown>(r.find((x) => x.key === k)?.value, null);
   const buyerCompanyId = g("buyerCompanyId") as number | null;
   let mandates = (g("mandates") as DemoConfig["mandates"] | null) ?? {};
-  const legacy = g("supplierMandate") as SupplierMandate | null; // setups saved before profiles existed
-  if (!mandates.default && legacy && buyerCompanyId) {
-    const b = getDb().get<BuyerMandate>("SELECT currency, max_unit_price, opening_unit_price, max_lead_time_days, allowed_payment_terms FROM negotiation_policies WHERE company_id=? AND side='BUYER'", buyerCompanyId);
-    if (b) mandates = { ...mandates, default: { buyer: b, supplier: legacy } };
-  }
   return { buyerCompanyId, rep: g("rep") as DemoConfig["rep"], mandates, deliveryLocation: g("deliveryLocation") as string | null };
 }
 export const putDemoConfig = (k: string, v: unknown): void => void getDb().run("INSERT INTO demo_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", k, JSON.stringify(v));
@@ -215,10 +210,11 @@ export async function runMission(ctx: TaskContext, missionId: number): Promise<{
     db.update("missions", missionId, { ranking: JSON.stringify(ranking) });
     if (!ranking.length) { addStep(missionId, "rank", "No researched events with exhibitors yet. Research an event first.", "ERROR"); setMission(missionId, { status: "FAILED", error: "No events" }); return { status: "FAILED" }; }
     addStep(missionId, "rank", `Ranked ${ranking.length} events by matching exhibitors`, "DONE", { ranking });
-    const best = ranking[0]!;
+    const forced = typeof ctx.payload.eventId === "number" ? ctx.payload.eventId : null;
+    const best = (forced ? ranking.find((r) => r.eventId === forced) : undefined) ?? ranking[0]!;
     if (best.matching === 0) { addStep(missionId, "choose", "No exhibitor at any researched event matches this product yet.", "ERROR", { ranking }); setMission(missionId, { status: "FAILED", error: "No matches" }); return { status: "FAILED" }; }
     const why = best.fitsDeadline === true ? `${best.matching} matching exhibitors (${best.specific} mention “${specific.join(" / ")}”), and it takes place ${best.startDate} — before your deadline` : best.fitsDeadline === false ? `${best.matching} matching exhibitors (note: dates do not fit your deadline)` : `${best.matching} matching exhibitors`;
-    addStep(missionId, "choose", `Chosen: ${best.name} — ${why}`, "DONE", { eventId: best.eventId, why });
+    addStep(missionId, "choose", `${forced === best.eventId ? "Your choice" : "Chosen"}: ${best.name} — ${why}`, "DONE", { eventId: best.eventId, why });
     setMission(missionId, { event_id: best.eventId });
     await think(missionId, "Why this event", { deadline: parsed.deadline, product: parsed.product, events: ranking.map((r) => ({ name: r.name, startDate: r.startDate, exhibitorsRead: r.exhibitors - r.pendingProfiles, matchingExhibitors: r.matching, exactMentions: r.specific, startsBeforeDeadline: r.fitsDeadline })), chosen: best.name },
       `I compared ${ranking.length} events by how many exhibitors match your product and whether the event happens before your deadline. ${best.name} has ${best.matching} matching exhibitors${best.fitsDeadline === true ? " and takes place before your deadline" : ""}, so I chose it.`);

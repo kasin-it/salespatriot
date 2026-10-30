@@ -226,3 +226,20 @@ export function buildBriefing(requestId: number): { briefing: Briefing; startAut
   audit({ actorType: "agent", actorId: "matching", companyId: r.company_id, action: "field_request.briefing", entityType: "field_request", entityId: r.id, summary: `Briefing: ${briefing.fit.priceVsMandate}; ${briefing.matchedNotices.length} matching open notice(s)` });
   return { briefing, startAutopilot: start };
 }
+
+/** While-event discussion: after reading the material the agent writes back to the salesperson with exactly what is still missing. */
+export async function sendDebrief(requestId: number): Promise<boolean> {
+  const db = getDb();
+  const r = db.get<{ token: string; mission_id: number | null; summary: string | null; stand_hint: string | null; rep_email: string; rep_name: string }>(
+    "SELECT r.token, r.mission_id, r.summary, r.stand_hint, p.email rep_email, p.name rep_name FROM field_requests r JOIN field_reps p ON p.id=r.rep_id WHERE r.id=?", requestId);
+  if (!r || !smtpReady()) return false;
+  const gaps = json<{ gaps?: string[] }>(r.summary, {}).gaps ?? [];
+  const subject = `Dopytanie${r.stand_hint ? ` — stoisko ${r.stand_hint}` : ""} [${r.token}]`;
+  const body = [`Dzięki ${r.rep_name}, materiały dotarły i są przeanalizowane.`, "", gaps.length ? `Do domknięcia brakuje jeszcze: ${gaps.join("; ")}.` : "Niczego więcej nie potrzebuję.", gaps.length ? "Jeśli możesz, dopytaj o to przedstawiciela stoiska i odpisz w tym wątku." : "", "", "Negocjuję teraz z agentem dostawcy w ramach naszego mandatu.", "— Agent Arsenal AI"].filter((x, i, a) => !(x === "" && a[i - 1] === "")).join("\n");
+  try {
+    const t = nodemailer.createTransport({ host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT ?? 587), secure: process.env.SMTP_SECURE === "true" });
+    await t.sendMail({ from: process.env.SMTP_FROM, to: r.rep_email, subject, text: body });
+    logAgentEmail({ kind: "debrief", from: process.env.SMTP_FROM!, to: r.rep_email, subject, body, missionId: r.mission_id });
+    return true;
+  } catch { return false; }
+}

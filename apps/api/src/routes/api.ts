@@ -20,6 +20,7 @@ import * as neg from "../services/negotiation.ts";
 import { draftEmail, parseTermsFromText, prepareCall, recordIncomingEmail, rfqEmailBody, sendApprovedEmail, smtpConfigured, twilioConfigured } from "../services/communication.ts";
 import { discoverServer, executeMcpTool, loadMcpConfig, registry, syncConfiguredServers } from "../mcp/adapter.ts";
 import { logAgentEmail } from "../services/emaillog.ts";
+import { dispatchCampaign, followupDrafts, sendFollowups } from "../services/campaign.ts";
 import { loadProfile, saveProfile } from "../services/preevent.ts";
 import { addStep, getDemoConfig, putDemoConfig, rankEvents } from "../services/mission.ts";
 import { visionConfigured, visionModel, visionProvider } from "../services/vision.ts";
@@ -665,7 +666,7 @@ api.get("/demo/suggestions", (c) => c.json(["Find me events where I can source 2
 api.get("/demo/suggestions-preevent", (c) => c.json(["Find me a war-tech startup that builds autonomous counter-drone interceptors.", "Find me a startup that builds counter-drone interceptors, 20 units by Q2."]));
 
 api.post("/missions", async (c) => {
-  const b = await body(c, z.object({ prompt: z.string().min(8).max(400).optional(), field: z.object({ eventId: z.number().int(), targetCompanyId: z.number().int(), standHint: z.string().nullish(), quantity: z.number().positive().nullish(), profile: z.enum(["default", "drone"]).optional() }).optional(), preevent: z.object({ supplierCompanyId: z.number().int().optional() }).optional() }));
+  const b = await body(c, z.object({ prompt: z.string().min(8).max(400).optional(), field: z.object({ eventId: z.number().int(), targetCompanyId: z.number().int(), standHint: z.string().nullish(), quantity: z.number().positive().nullish(), profile: z.enum(["default", "drone"]).optional() }).optional(), preevent: z.object({ supplierCompanyId: z.number().int().optional() }).optional(), eventId: z.number().int().optional() }));
   const cfg = getDemoConfig();
   const needFull = !b.preevent;
   if (!cfg.buyerCompanyId || !userCompanyIds(uid(c)).includes(cfg.buyerCompanyId) || (needFull && (!cfg.rep || !(cfg.mandates.default || cfg.mandates.drone)))) return c.json({ error: "Complete the demo setup first (buyer company, mandates, salesperson)." }, 422);
@@ -673,7 +674,7 @@ api.post("/missions", async (c) => {
   const kind = b.field ? "FIELD" : b.preevent ? "PREEVENT" : "SOURCING";
   const id = db().insert("missions", { company_id: cfg.buyerCompanyId, user_id: uid(c), kind, prompt: b.prompt ?? `Field visit: company ${b.field!.targetCompanyId}`, status: "RUNNING" });
   addStep(id, "start", b.prompt ? `Request: "${b.prompt}"` : "Field mode: you are at the event", "DONE");
-  const taskId = enqueueTask("buyer_agent", "mission.run", { missionId: id, preevent: b.preevent, field: b.field ? { ...b.field, standHint: b.field.standHint ?? null, quantity: b.field.quantity ?? null } : undefined }, `user:${uid(c)}`, { companyId: cfg.buyerCompanyId, priority: 1 });
+  const taskId = enqueueTask("buyer_agent", "mission.run", { missionId: id, preevent: b.preevent, eventId: b.eventId, field: b.field ? { ...b.field, standHint: b.field.standHint ?? null, quantity: b.field.quantity ?? null } : undefined }, `user:${uid(c)}`, { companyId: cfg.buyerCompanyId, priority: 1 });
   return c.json({ id, taskId }, 201);
 });
 api.get("/missions", (c) => { const mine = userCompanyIds(uid(c)).join(",") || "0"; return c.json(db().all(`SELECT id, kind, prompt, status, created_at FROM missions WHERE archived=0 AND company_id IN (${mine}) ORDER BY id DESC LIMIT 20`)); });
@@ -716,6 +717,123 @@ api.get("/missions/:id/emails/:mid", async (c) => {
   return c.json({ subject: d.Subject, from: d.From.Address, to: d.To.map((t) => t.Address).join(", "), text: d.Text, attachments: d.Attachments.map((a) => a.FileName) });
 });
 void rankEvents; void errorMessage;
+
+// ---- Campaigns: Before / While / After for one event -------------------------------------------------------------
+api.post("/campaigns", async (c) => {
+  const b = await body(c, z.object({ prompt: z.string().min(8).max(400), eventId: z.number().int() }));
+  const cfg = getDemoConfig();
+  if (!cfg.buyerCompanyId || !userCompanyIds(uid(c)).includes(cfg.buyerCompanyId)) return c.json({ error: "Complete the demo setup first (buyer company)." }, 422);
+  if (!db().get("SELECT id FROM events WHERE id=?", b.eventId)) return c.json({ error: "Event not found" }, 404);
+  const id = db().insert("missions", { company_id: cfg.buyerCompanyId, user_id: uid(c), kind: "CAMPAIGN", prompt: b.prompt, status: "INVESTIGATING", event_id: b.eventId });
+  addStep(id, "start", `Request: "${b.prompt}"`, "DONE");
+  const taskId = enqueueTask("buyer_agent", "campaign.investigate", { missionId: id }, `user:${uid(c)}`, { companyId: cfg.buyerCompanyId, priority: 1 });
+  return c.json({ id, taskId }, 201);
+});
+api.get("/campaigns/:id", (c) => {
+  const id = Number(c.req.param("id"));
+  const m = db().get<Record<string, unknown> & { company_id: number; event_id: number }>("SELECT * FROM missions WHERE id=? AND kind='CAMPAIGN'", id);
+  if (!m) return c.json({ error: "Campaign not found" }, 404);
+  requireMember(uid(c), m.company_id);
+  const children = db().all<Record<string, unknown>>(`
+    SELECT m.id, m.status, m.target_company_id, tc.canonical_name target_name, fr.stand_hint, fr.status fr_status, fr.token, fr.sent_at, fr.replied_at, fr.summary, p.name person_name, p.email person_email,
+      m.negotiation_id, d.deal_ref, d.total_value, d.currency, d.mode deal_mode, n.buyer_policy_snapshot, n.supplier_policy_snapshot,
+      (SELECT COUNT(*) FROM approvals a WHERE a.entity_type='negotiation' AND a.entity_id=m.negotiation_id AND a.decided_by_user_id IS NOT NULL) human_approvals
+    FROM missions m LEFT JOIN companies tc ON tc.id=m.target_company_id LEFT JOIN field_requests fr ON fr.id=m.field_request_id LEFT JOIN field_reps p ON p.id=fr.rep_id
+      LEFT JOIN deals d ON d.id=m.deal_id LEFT JOIN negotiations n ON n.id=m.negotiation_id WHERE m.parent_id=? ORDER BY m.id`, id);
+  const kids = children.map((k) => ({
+    ...k, summary: json(k.summary as string, null), buyer_policy_snapshot: undefined, supplier_policy_snapshot: undefined,
+    offers: k.negotiation_id ? db().all<{ terms: string }>("SELECT version, kind, from_company_id, terms, status FROM offers WHERE negotiation_id=? ORDER BY version", k.negotiation_id as number).map((o) => ({ ...o, terms: json(o.terms, {}) })) : [],
+    mandate: { buyerMax: json<{ max_unit_price?: number }>(k.buyer_policy_snapshot as string, {}).max_unit_price ?? null, supplierMin: json<{ min_unit_price?: number }>(k.supplier_policy_snapshot as string, {}).min_unit_price ?? null, buyerCompanyId: m.company_id },
+  }));
+  const ids = [id, ...children.map((k) => Number(k.id))].join(",");
+  const emails = db().all(`SELECT id, kind, from_addr, to_addr, subject, created_at, mission_id FROM agent_emails WHERE mission_id IN (${ids}) ORDER BY id`);
+  const steps = db().all<{ detail: string | null }>("SELECT * FROM mission_steps WHERE mission_id=? ORDER BY id", id).map((s) => ({ ...s, detail: json(s.detail, null) }));
+  const childSteps = db().all<{ detail: string | null; kind: string }>(`SELECT * FROM mission_steps WHERE mission_id IN (${children.map((k) => Number(k.id)).join(",") || "0"}) AND kind IN ('think','extract','briefing','rounds','deal') ORDER BY id`).map((s) => ({ ...s, detail: json(s.detail, null) }));
+  const event = db().get("SELECT id, name, start_date, end_date, official_url FROM events WHERE id=?", m.event_id);
+  return c.json({ mission: { ...m, parsed: json(m.parsed as string, null), report: json(m.report as string, {}) }, event, steps, children: kids, childSteps, emails, mailpitUrl: mailpit() });
+});
+api.post("/campaigns/:id/dispatch", async (c) => {
+  const id = Number(c.req.param("id"));
+  const m = db().get<{ company_id: number }>("SELECT company_id FROM missions WHERE id=? AND kind='CAMPAIGN'", id);
+  if (!m) return c.json({ error: "Campaign not found" }, 404);
+  requireMember(uid(c), m.company_id, "MEMBER");
+  const b = await body(c, z.object({ companyIds: z.array(z.number().int()).min(1).max(6) }));
+  return c.json({ missions: dispatchCampaign(uid(c), id, b.companyIds) });
+});
+api.get("/campaigns/:id/followups", (c) => {
+  const id = Number(c.req.param("id"));
+  const m = db().get<{ company_id: number }>("SELECT company_id FROM missions WHERE id=? AND kind='CAMPAIGN'", id);
+  if (!m) return c.json({ error: "Campaign not found" }, 404);
+  requireMember(uid(c), m.company_id);
+  return c.json(followupDrafts(id));
+});
+api.post("/campaigns/:id/followups", async (c) => {
+  const id = Number(c.req.param("id"));
+  const m = db().get<{ company_id: number }>("SELECT company_id FROM missions WHERE id=? AND kind='CAMPAIGN'", id);
+  if (!m) return c.json({ error: "Campaign not found" }, 404);
+  requireMember(uid(c), m.company_id, "MEMBER");
+  return c.json(await sendFollowups(uid(c), id));
+});
+
+// ---- One simple flow: preview what matters, then send agents to THAT event -------------------------------------------
+api.post("/events-preview", async (c) => {
+  const b = await body(c, z.object({ prompt: z.string().min(8).max(400), eventId: z.number().int().optional() }));
+  const { parseRequest, rankEvents, planStands, specificTokens } = await import("../services/mission.ts");
+  const { demandForCategory } = await import("../services/demand.ts");
+  const parsed = await parseRequest(b.prompt);
+  if (!parsed.categoryKey) return c.json({ error: "I could not map this to a product category. Name the product or technology (e.g. thermal cameras, reconnaissance drones)." }, 422);
+  const specific = specificTokens(parsed.product);
+  const ranking = rankEvents(parsed.categoryKey, parsed.deadline, specific).slice(0, 4);
+  if (!ranking.length) return c.json({ error: "No researched event has exhibitors yet. Add an event first." }, 422);
+  const chosen = ranking.find((r) => r.eventId === b.eventId) ?? ranking[0]!;
+  const stands = planStands(chosen.eventId, parsed.categoryKey, specific);
+  const demand = demandForCategory(parsed.categoryKey, { specific, limit: 3 });
+  const mine = userCompanyIds(uid(c)).join(",") || "0";
+  const already = db().all<{ name: string; email: string }>(`SELECT DISTINCT p.name, p.email FROM missions m JOIN field_requests fr ON fr.id=m.field_request_id JOIN field_reps p ON p.id=fr.rep_id WHERE m.event_id=? AND m.archived=0 AND m.company_id IN (${mine}) AND m.status NOT IN ('FAILED')`, chosen.eventId);
+  return c.json({ parsed, specific, ranking, chosenEventId: chosen.eventId, stands, demand: { totals: demand.totals, open: demand.open }, alreadyThere: already });
+});
+
+// Where your people are: events with your staff, and the log for each event.
+api.get("/field-events", (c) => {
+  const mine = userCompanyIds(uid(c)).join(",") || "0";
+  const events = db().all<{ id: number; name: string; start_date: string | null; end_date: string | null; missions: number; deals: number; last_at: string }>(
+    `SELECT e.id, e.name, e.start_date, e.end_date, COUNT(DISTINCT m.id) missions, SUM(m.status='DEAL_CLOSED') deals, MAX(m.updated_at) last_at
+     FROM missions m JOIN events e ON e.id=m.event_id WHERE m.archived=0 AND m.company_id IN (${mine}) GROUP BY e.id ORDER BY last_at DESC`);
+  return c.json(events.map((e) => ({
+    ...e,
+    people: db().all(`SELECT DISTINCT p.name, p.email FROM missions m JOIN field_requests fr ON fr.id=m.field_request_id JOIN field_reps p ON p.id=fr.rep_id WHERE m.event_id=? AND m.archived=0 AND m.company_id IN (${mine})`, e.id),
+    emails: db().get<{ n: number }>(`SELECT COUNT(*) n FROM agent_emails WHERE mission_id IN (SELECT id FROM missions WHERE event_id=? AND archived=0 AND company_id IN (${mine}))`, e.id)?.n ?? 0,
+    active: db().get<{ n: number }>(`SELECT COUNT(*) n FROM missions WHERE event_id=? AND archived=0 AND company_id IN (${mine}) AND status IN ('RUNNING','WAITING_REPLY','NEGOTIATING','INVESTIGATING')`, e.id)?.n ?? 0,
+    campaign: db().get(`SELECT id, status FROM missions WHERE event_id=? AND kind='CAMPAIGN' AND archived=0 AND company_id IN (${mine}) ORDER BY id DESC LIMIT 1`, e.id) ?? null,
+  })));
+});
+api.get("/field-events/:id", (c) => {
+  const eid = Number(c.req.param("id"));
+  const mine = userCompanyIds(uid(c)).join(",") || "0";
+  const ev = db().get<Record<string, unknown>>("SELECT id, name, start_date, end_date, official_url, exhibitor_directory_url FROM events WHERE id=?", eid);
+  if (!ev) return c.json({ error: "Event not found" }, 404);
+  const missions = db().all<Record<string, unknown>>(`
+    SELECT m.id, m.kind, m.prompt, m.status, m.created_at, m.target_company_id, tc.canonical_name target_name, fr.stand_hint, fr.status fr_status, fr.sent_at, fr.replied_at,
+      p.name person_name, p.email person_email, d.deal_ref, d.total_value, d.currency, d.mode deal_mode
+    FROM missions m LEFT JOIN companies tc ON tc.id=m.target_company_id LEFT JOIN field_requests fr ON fr.id=m.field_request_id LEFT JOIN field_reps p ON p.id=fr.rep_id LEFT JOIN deals d ON d.id=m.deal_id
+    WHERE m.event_id=? AND m.archived=0 AND m.company_id IN (${mine}) ORDER BY m.id`, eid);
+  const ids = missions.map((m) => Number(m.id));
+  const inIds = ids.join(",") || "0";
+  const emails = db().all<{ id: number; kind: string; from_addr: string; to_addr: string; subject: string; created_at: string; mission_id: number | null }>(`SELECT id, kind, from_addr, to_addr, subject, created_at, mission_id FROM agent_emails WHERE mission_id IN (${inIds})`);
+  const steps = db().all<{ id: number; kind: string; title: string; created_at: string; mission_id: number; detail: string | null }>(`SELECT id, kind, title, created_at, mission_id, detail FROM mission_steps WHERE mission_id IN (${inIds}) AND kind != 'mail'`);
+  const log = [
+    ...emails.map((e) => ({ type: "email", id: e.id, kind: e.kind, title: e.subject, from: e.from_addr, to: e.to_addr, at: e.created_at, missionId: e.mission_id })),
+    ...steps.map((s) => ({ type: s.kind === "think" ? "thought" : "step", id: s.id, kind: s.kind, title: s.kind === "think" ? `${s.title}: ${json<{ text?: string }>(s.detail, {}).text ?? ""}` : s.title, at: s.created_at, missionId: s.mission_id })),
+  ].sort((a, b) => a.at.localeCompare(b.at) || (a.type === "email" ? 1 : -1));
+  const counterpart = (tid: unknown) => { const pr = tid ? loadProfile(Number(tid)) : undefined; return pr ? { attendees: pr.attendees, stand: pr.stand, slots: pr.meeting_slots } : null; };
+  return c.json({
+    event: ev,
+    people: missions.filter((m) => m.person_email).map((m) => ({ ...m, counterpart: counterpart(m.target_company_id) })),
+    meetings: missions.filter((m) => m.kind === "PREEVENT").map((m) => ({ id: m.id, target: m.target_name, status: m.status, counterpart: counterpart(m.target_company_id) })),
+    deals: missions.filter((m) => m.status === "DEAL_CLOSED").map((m) => ({ missionId: m.id, ref: m.deal_ref, supplier: m.target_name, value: m.total_value, currency: m.currency, mode: m.deal_mode })),
+    log,
+  });
+});
 
 // ---- Command Center: one screen for the jury ----------------------------------------------------------------------
 api.get("/command-center", (c) => {
