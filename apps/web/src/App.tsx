@@ -13,13 +13,14 @@ import { Agents } from "./pages/Agents.tsx";
 import { FieldAgent } from "./pages/Field.tsx";
 import { Communication } from "./pages/Communication.tsx";
 import { Negotiations, NegotiationRoom } from "./pages/Negotiations.tsx";
+import { Bidding } from "./pages/Bidding.tsx";
 import { Deals } from "./pages/Deals.tsx";
 import { Integrations } from "./pages/Integrations.tsx";
 import { Settings } from "./pages/Settings.tsx";
 
 const NAV: [string, string][] = [
   ["/", "Mission Control"], ["/events", "Events"], ["/companies", "Companies"], ["/procurement", "Procurement"],
-  ["/negotiations", "Negotiations"], ["/deals", "Deals"], ["/overview", "Overview"], ["/matches", "Matching"], ["/agents", "Agents"],
+  ["/negotiations", "Negotiations"], ["/bidding", "Agent Bidding"], ["/deals", "Deals"], ["/overview", "Overview"], ["/matches", "Matching"], ["/agents", "Agents"],
   ["/field", "Field Agent"], ["/communication", "Communication"], ["/integrations", "Integrations"], ["/settings", "Settings"],
 ];
 
@@ -97,6 +98,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
           <Route path="/communication" element={<Communication />} />
           <Route path="/negotiations" element={<Negotiations />} />
           <Route path="/negotiations/:id" element={<NegotiationRoom />} />
+          <Route path="/bidding" element={<Bidding />} />
           <Route path="/deals" element={<Deals />} />
           <Route path="/integrations" element={<Integrations />} />
           <Route path="/settings" element={<Settings />} />
