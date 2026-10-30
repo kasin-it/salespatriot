@@ -10,5 +10,6 @@
     "types": ["node"],
     "lib": ["es2024"]
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/ui"]
 }

@@ -1,0 +1,84 @@
+/* The dashboard's design system is the only palette; this file only adds the dense layout an inline view needs. */
+@import "../../../web/src/styles/arsenal-design-system.css";
+
+body { margin: 0; background: var(--ds-paper); color: var(--ds-ink); font: 400 14px/1.5 var(--ds-font); letter-spacing: var(--ds-track); }
+#root { display: flex; flex-direction: column; gap: 16px; padding: 16px; }
+
+/* Same dense button as apps/web/src/index.css. */
+.ds-btn--sm { --c: 7px; min-height: 32px; padding: 0 12px; gap: 6px; font-size: 12px; }
+
+/* Ink nav bar with a chamfered corner, as on salespatriot.com. */
+.x-bar { display: flex; align-items: center; gap: 8px; margin: -16px -16px 0; padding: 12px 16px; background: var(--ds-ink); color: var(--ds-on-dark); }
+.x-bar .ds-brand { font-size: 15px; white-space: nowrap; margin-right: 8px; }
+.x-bar .ds-input { flex: 1; border-color: transparent; min-width: 0; height: 32px; font-size: 13px; padding: 0 12px; }
+.x-head { display: flex; flex-direction: column; gap: 4px; }
+.x-head h1 { font: 400 28px/1.1 var(--ds-font); letter-spacing: var(--ds-track); margin: 0; }
+.x-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.x-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
+.x-stats > * { background: var(--ds-mist); padding: 12px; }
+.x-stats .ds-stat__value { font-size: 24px; font-variant-numeric: tabular-nums; }
+
+.x-card { border: 1px solid var(--ds-line); }
+.x-card > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; border-bottom: 1px solid var(--ds-line); }
+.x-card > header h2 { margin: 0; }
+.x-card > header .ds-input { width: 180px; height: 28px; font-size: 12px; padding: 0 8px; }
+
+.x-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.x-table th { font: 500 var(--ds-fs-micro)/1.3 var(--ds-mono); text-transform: uppercase; color: var(--ds-ink-70); text-align: left; padding: 8px 12px; }
+.x-table td { padding: 8px 12px; border-top: 1px solid var(--ds-line); vertical-align: top; overflow-wrap: anywhere; }
+.x-table .ds-tag { white-space: nowrap; overflow-wrap: normal; }
+.x-table tr[tabindex] { cursor: pointer; }
+.x-table tr[tabindex]:hover td, .x-table tr[tabindex]:focus-visible td { background: var(--ds-fill); outline: none; }
+
+.x-sub { color: var(--ds-ink-70); font-size: 11px; }
+.x-unknown { color: var(--ds-ink-70); font-style: italic; }
+.x-link { background: none; border: 0; padding: 0; font: inherit; color: var(--ds-accent); cursor: pointer; text-align: left; overflow-wrap: anywhere; }
+.x-link:hover { text-decoration: underline; }
+.x-empty { margin: 12px; padding: 24px; border: 1px dashed var(--ds-ink-50); text-align: center; color: var(--ds-ink-70); font-size: 13px; }
+.x-error { padding: 12px; border: 1px solid var(--ds-alert); color: var(--ds-alert); font-size: 13px; }
+.x-more { padding: 8px 12px; border-top: 1px solid var(--ds-line); }
+.x-tag-alert { background: transparent; color: var(--ds-alert); box-shadow: inset 0 0 0 1px var(--ds-alert); }
+#root[aria-busy="true"] > :not(.x-bar) { opacity: 0.5; }
+
+/* Full-strength SalesPatriot surfaces: ink hero and card heads, blue signal, mist ground. Later rules win over the base layout above. */
+html, body { background: var(--ds-mist); }
+.x-bar { padding: 16px; }
+.x-bar + .x-head { margin-top: -16px; }
+.x-head { margin-inline: -16px; padding: 24px 16px 32px; gap: 8px; background: var(--ds-ink); color: var(--ds-on-dark); clip-path: polygon(0 0, 100% 0, 100% calc(100% - 24px), calc(100% - 24px) 100%, 0 100%); }
+.x-head h1 { font-size: clamp(32px, 6vw, 44px); line-height: 1; color: #fff; }
+.x-head .ds-label { color: var(--ds-accent-soft); margin: 0; }
+.x-head .x-link { color: var(--ds-accent-soft); }
+.x-head .x-sub, .x-head .x-unknown { color: var(--ds-on-dark-muted); font-size: 13px; }
+.x-head .ds-tag--muted, .x-head .ds-tag--outline { background: transparent; color: #fff; box-shadow: inset 0 0 0 1px var(--ds-on-dark-muted); }
+.x-wordmark { font: 700 clamp(56px, 13vw, 104px)/0.9 var(--ds-font); letter-spacing: -0.05em; text-transform: uppercase; color: #fff; white-space: nowrap; overflow: hidden; }
+
+.x-stats > * { background: var(--ds-ink); color: #fff; padding: 16px; }
+.x-stats > :first-child { background: var(--ds-accent); }
+.x-stats .ds-stat__value { font-size: 32px; color: #fff; }
+.x-stats .ds-stat__label { color: var(--ds-on-dark-muted); }
+.x-stats > :first-child .ds-stat__label { color: #fff; }
+
+.x-card { border: 0; background: var(--ds-paper); }
+.x-card > header { background: var(--ds-ink); border: 0; padding: 12px; }
+.x-card > header .ds-label { color: #fff; margin: 0; }
+.x-card > header .ds-input { border-color: transparent; }
+.x-card--live > header { background: var(--ds-accent); }
+.x-head .ds-dot, .x-card > header .ds-dot { background: var(--ds-accent); }
+.x-card--live > header .ds-dot { background: #fff; }
+
+.x-table th { background: var(--ds-mist-2); color: var(--ds-ink); font-weight: 600; }
+.x-table td { font-weight: 500; border-top-color: var(--ds-steel); }
+.x-table tr[tabindex]:hover td, .x-table tr[tabindex]:focus-visible td { background: var(--ds-accent); color: #fff; }
+.x-table tr[tabindex]:hover .x-sub, .x-table tr[tabindex]:focus-visible .x-sub { color: #fff; }
+.x-table .ds-tag--muted { background: var(--ds-ink); color: #fff; }
+.x-sub { font-weight: 400; }
+.x-num { font: 600 18px/1 var(--ds-mono); color: var(--ds-accent); }
+tr[tabindex]:hover .x-num, tr[tabindex]:focus-visible .x-num { color: #fff; }
+
+.x-bar { flex-wrap: wrap; }
+.x-bar .ds-input { min-width: 160px; }
+.x-banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 16px; background: var(--ds-accent); color: #fff; font: 600 13px/1.3 var(--ds-mono); text-transform: uppercase; }
+.x-note { margin: 0; padding: 8px 12px; border-left: 2px solid var(--ds-ink); background: var(--ds-fill); font-size: 12px; }
+.x-mail { margin: 0; padding: 16px; background: var(--ds-paper); font: 400 13px/1.5 var(--ds-font); white-space: pre-wrap; overflow-wrap: anywhere; }
+.x-head .ds-tag--dark { background: #fff; color: var(--ds-ink); }
+.x-stats .ds-stat__value { font-size: 26px; }

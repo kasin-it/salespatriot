@@ -10,6 +10,7 @@
     "migrate": "node --env-file-if-exists=.env src/db/migrate-cli.ts",
     "seed:snapshot": "node --env-file-if-exists=.env scripts/import-snapshot.ts",
     "seed:demo": "node --env-file-if-exists=.env scripts/demo-setup.ts",
+    "seed:mock": "node --env-file-if-exists=.env src/db/seed-mock-events.ts",
     "build": "tsc --noEmit -p .",
     "typecheck": "tsc --noEmit -p .",
     "test": "node --test --test-concurrency=1 'test/**/*.test.ts'",
