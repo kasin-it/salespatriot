@@ -94,3 +94,12 @@ test("demand: a notice naming the product in its title outranks a CPV mention; a
   assert.equal(d.awards.length, 1);
   assert.equal(d.awards[0]!.demandClass, "HISTORICAL_DEMAND");
 });
+
+import { numbersGrounded } from "../src/services/think.ts";
+test("reasoning guard: numbers must come from the facts, small counts excepted", () => {
+  const facts = { matching: 152, startDate: "2027-03-01", tenders: 15 };
+  assert.equal(numbersGrounded("I chose it: 152 exhibitors match and it starts 2027-03-01 with 15 tenders.", facts), true);
+  assert.equal(numbersGrounded("I chose it because 190 exhibitors match.", facts), false);
+  assert.equal(numbersGrounded("Top 3 stands, 2 of them strong.", facts), true);
+  assert.equal(numbersGrounded("The price is 1150 EUR.", facts), false);
+});

@@ -5,6 +5,7 @@ import { errorMessage, now } from "../lib/util.ts";
 import { CATEGORIES, CATEGORY_BY_KEY, classifyText } from "../lib/taxonomy.ts";
 import { sendFieldRequest } from "./field.ts";
 import { demandForCategory } from "./demand.ts";
+import { think } from "./think.ts";
 import * as neg from "./negotiation.ts";
 import type { TaskContext } from "../agents/orchestrator.ts";
 
@@ -198,12 +199,16 @@ export async function runMission(ctx: TaskContext, missionId: number): Promise<{
     const parsed = await parseRequest(m.prompt);
     db.update("missions", missionId, { parsed: JSON.stringify(parsed) });
     addStep(missionId, "parse", `Understood: ${parsed.quantity ?? "?"} × ${parsed.product}${parsed.deadlineText ? `, ${/^by\b/i.test(parsed.deadlineText) ? "" : "by "}${parsed.deadlineText}` : ""} → category “${parsed.categoryLabel ?? "unknown"}”`, "DONE", { ...parsed });
+    await think(missionId, "How I read your request", { request: m.prompt, quantity: parsed.quantity, deadline: parsed.deadline, product: parsed.product, category: parsed.categoryLabel, matchedBy: parsed.parsedBy === "LLM" ? "language model" : "taxonomy terms in your sentence" },
+      `I read this as a request for ${parsed.quantity ?? "an unspecified number of"} × ${parsed.product}${parsed.deadline ? `, needed by ${parsed.deadline}` : ""}. I mapped it to “${parsed.categoryLabel ?? "no category"}” using ${parsed.parsedBy === "LLM" ? "a language model" : "terms found in your sentence"}.`);
     if (!parsed.categoryKey) { addStep(missionId, "parse", "I could not map this request to a product category. Try naming the product (e.g. thermal cameras).", "ERROR"); setMission(missionId, { status: "FAILED", error: "No category" }); return { status: "FAILED" }; }
 
     const profile = profileFor(parsed.categoryKey);
     const demand = demandForCategory(parsed.categoryKey, { specific: specificTokens(parsed.product), limit: 5 });
     addStep(missionId, "demand", `Real demand: ${demand.totals.open} open tender${demand.totals.open === 1 ? "" : "s"} and ${demand.totals.awards} recent award${demand.totals.awards === 1 ? "" : "s"} for “${parsed.categoryLabel}” in TED / e-Zamówienia`, "DONE", demand);
 
+    await think(missionId, "What the tenders tell me", { openTenders: demand.totals.open, recentAwards: demand.totals.awards, topOpen: demand.open.slice(0, 3).map((n) => ({ title: n.title, authority: n.authority, country: n.country })), caveat: "A tender shows public demand; it does not mean the buyer wants to trade with us" },
+      `I found ${demand.totals.open} open tenders and ${demand.totals.awards} recent awards in this category. That shows real public demand, but not that any buyer wants to trade with us, so I treat it as context.`);
     ctx.progress("Ranking events");
     const specific = specificTokens(parsed.product);
     const ranking = rankEvents(parsed.categoryKey, parsed.deadline, specific);
@@ -215,6 +220,8 @@ export async function runMission(ctx: TaskContext, missionId: number): Promise<{
     const why = best.fitsDeadline === true ? `${best.matching} matching exhibitors (${best.specific} mention “${specific.join(" / ")}”), and it takes place ${best.startDate} — before your deadline` : best.fitsDeadline === false ? `${best.matching} matching exhibitors (note: dates do not fit your deadline)` : `${best.matching} matching exhibitors`;
     addStep(missionId, "choose", `Chosen: ${best.name} — ${why}`, "DONE", { eventId: best.eventId, why });
     setMission(missionId, { event_id: best.eventId });
+    await think(missionId, "Why this event", { deadline: parsed.deadline, product: parsed.product, events: ranking.map((r) => ({ name: r.name, startDate: r.startDate, exhibitorsRead: r.exhibitors - r.pendingProfiles, matchingExhibitors: r.matching, exactMentions: r.specific, startsBeforeDeadline: r.fitsDeadline })), chosen: best.name },
+      `I compared ${ranking.length} events by how many exhibitors match your product and whether the event happens before your deadline. ${best.name} has ${best.matching} matching exhibitors${best.fitsDeadline === true ? " and takes place before your deadline" : ""}, so I chose it.`);
 
     const plan = planStands(best.eventId, parsed.categoryKey, specific);
     db.update("missions", missionId, { plan: JSON.stringify(plan) });
@@ -222,6 +229,8 @@ export async function runMission(ctx: TaskContext, missionId: number): Promise<{
     addStep(missionId, "plan", `Top ${plan.length} stands to visit`, "DONE", { plan });
     const target = plan[0]!;
     setMission(missionId, { target_company_id: target.companyId });
+    await think(missionId, "Why these stands", { product: parsed.product, stands: plan.map((p) => ({ name: p.name, stand: p.booth, mentionsProductTerms: p.specificHits, evidence: p.evidence.slice(0, 110) })), unknown: "Prices, lead times and exact specifications are not public" },
+      `I picked the stands whose own text mentions your product terms most directly, starting with ${target.name}${target.booth ? ` at ${target.booth}` : ""}. What I do not know yet is price, lead time and exact specifications, so I need a person to look at the stand.`);
 
     if (!cfg.rep) { addStep(missionId, "email", "No salesperson configured. Add one in Demo setup.", "ERROR"); setMission(missionId, { status: "FAILED", error: "No rep" }); return { status: "FAILED" }; }
     applyBuyerMandate(profile, m.user_id);

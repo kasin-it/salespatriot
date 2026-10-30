@@ -13,6 +13,7 @@ import { syncEzamowienia } from "../connectors/ezamowienia.ts";
 import { extractorFor } from "../connectors/exhibitors.ts";
 import { buildBriefing, pollInbox, sendFieldRequest, mailpitUrl } from "../services/field.ts";
 import { runPreEventMission } from "../services/preevent.ts";
+import { think } from "../services/think.ts";
 import { addStep, runFieldMission, runMission, setMission } from "../services/mission.ts";
 import { runAutopilot } from "../services/autopilot.ts";
 import { NeedsApproval, acceptOffer, currentOffer, getNegotiation, policyFor, requestApproval, submitOffer } from "../services/negotiation.ts";
@@ -169,6 +170,8 @@ export function registerAllHandlers(): void {
       const sum = json<{ terms: Record<string, unknown>; gaps: string[]; photoCount?: number }>(fr.summary, { terms: {}, gaps: [] });
       addStep(fr.mission_id, "extract", `Photo & spec turned into parameters${sum.gaps.length ? ` — ${sum.gaps.length} gap(s) flagged` : ""}`, "DONE", { requestId: reqId });
       addStep(fr.mission_id, "briefing", `Briefing: ${briefing.fit.priceVsMandate}; ${briefing.matchedNotices.length} matching open tender(s)`, "DONE", briefing);
+      await think(fr.mission_id, "What the salesperson's material tells me", { terms: sum.terms, gaps: sum.gaps, photos: sum.photoCount ?? 0, mandate: briefing.buyerMandate ? { maxUnitPrice: briefing.buyerMandate.maxUnitPrice, currency: briefing.buyerMandate.currency, maxLeadTimeDays: briefing.buyerMandate.maxLeadTimeDays } : null, fit: briefing.fit },
+        `From the photo and documents I could read: ${Object.entries(sum.terms).map(([k, v]) => `${k} ${String(v)}`).join(", ") || "no commercial terms"}. ${briefing.fit.priceVsMandate}. ${sum.gaps.length ? `I will not guess the gaps: ${sum.gaps.join(", ")}.` : ""}`);
       if (startAutopilot) { setMission(fr.mission_id, { status: "NEGOTIATING", negotiation_id: startAutopilot.negotiationId }); addStep(fr.mission_id, "negotiate", "Buyer and supplier agents are negotiating by email…", "ACTIVE"); }
       else addStep(fr.mission_id, "negotiate", briefing.negotiation.decision, "ERROR");
     }
@@ -192,6 +195,10 @@ export function registerAllHandlers(): void {
       const mid = fr.mission_id;
       db.run("UPDATE mission_steps SET status='DONE', title='Buyer and supplier agents negotiated by email' WHERE mission_id=? AND kind='negotiate'", mid);
       addStep(mid, "rounds", `${db.get<{ c: number }>("SELECT COUNT(*) c FROM offers WHERE negotiation_id=?", negId)!.c} offers exchanged by email (RFQ → quotation${r.rounds ? ` → ${r.rounds} counteroffer${r.rounds > 1 ? "s" : ""}` : ""})`, "DONE", { log: r.log });
+      const offers = db.all<{ version: number; kind: string; from_company_id: number; terms: string }>("SELECT version, kind, from_company_id, terms FROM offers WHERE negotiation_id=? ORDER BY version", negId).map((o) => ({ version: o.version, kind: o.kind, from: o.from_company_id === db.get<{ b: number }>("SELECT buyer_company_id b FROM negotiations WHERE id=?", negId)!.b ? "buyer" : "supplier", unitPrice: json<{ unitPrice?: number | null }>(o.terms, {}).unitPrice ?? null }));
+      const bpol = db.get<{ max_unit_price: number | null; currency: string | null }>("SELECT max_unit_price, currency FROM negotiation_policies WHERE company_id=(SELECT buyer_company_id FROM negotiations WHERE id=?) AND side='BUYER'", negId);
+      await think(mid, "How the negotiation went", { offers, buyerMaxUnitPrice: bpol?.max_unit_price ?? null, currency: bpol?.currency ?? null, outcome: r.outcome, humanApprovals: r.humanApprovals },
+        `The supplier opened at ${offers.find((o) => o.from === "supplier")?.unitPrice ?? "an unknown price"}${bpol?.currency ? ` ${bpol.currency}` : ""}. I countered within my mandate (maximum ${bpol?.max_unit_price ?? "not set"}) and the outcome was ${r.outcome} with ${r.humanApprovals} human approvals.`);
       if (r.outcome === "DEAL") { setMission(mid, { status: "DEAL_CLOSED", deal_id: r.dealId }); addStep(mid, "deal", `DEAL CLOSED ${r.dealRef} — human approvals: ${r.humanApprovals}`, "DONE", { dealId: r.dealId, dealRef: r.dealRef }); }
       else { setMission(mid, { status: r.outcome }); addStep(mid, "deal", r.outcome === "NO_AGREEMENT" ? `No agreement within the two mandates (${r.reason ?? ""})` : `Escalated: ${r.reason ?? ""}`, "ERROR"); }
     }

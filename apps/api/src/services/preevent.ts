@@ -68,12 +68,12 @@ export function buyerIntro(c: Ctx): { subject: string; text: string; data: Recor
   return { subject: `Meeting at ${c.event}? Looking for ${c.product}`, text, data: { type: "PRE_EVENT_QUESTIONS", questions: [...QUESTIONS], need: { product: c.product, quantity: c.quantity, deadline: c.deadline } } };
 }
 
-const BANNER_SIM = "[SANDBOX — simulated supplier agent; facts below were entered by the demo operator, not published by the company]";
-const BANNER_OWN = "[SANDBOX — supplier agent of the operator's own demo company]";
-const banner = (p: SupplierProfile): string => (p.own_company ? BANNER_OWN : BANNER_SIM);
+const BANNER_SIM = "[SANDBOX — simulated supplier agent; the facts below were entered by the operator, not published by the company]";
+/** The operator's own company speaks for itself, so no banner. A real exhibitor's record is always flagged: its facts are the operator's, not the company's. */
+const banner = (p: SupplierProfile): string => (p.own_company ? "" : BANNER_SIM);
 const nm = (s: string): string => s.replace(/\.+$/, "");
 export function supplierReply1(p: SupplierProfile, c: Ctx, questions: readonly string[]): { text: string; data: Record<string, unknown> } {
-  const lines: string[] = [banner(p), "", `Hello ${nm(c.buyer)} team,`, "", `Thank you for reaching out about ${c.product}. Answers to your questions:`, ""];
+  const lines: string[] = [...(banner(p) ? [banner(p), ""] : []), `Hello ${nm(c.buyer)} team,`, "", `Thank you for reaching out about ${c.product}. Answers to your questions:`, ""];
   const ans = (q: string): string => {
     switch (q) {
       case "attendees": return p.attendees.length ? `On site: ${p.attendees.map((a) => `${a.name} (${a.role})`).join("; ")}${p.days_present ? `, ${p.days_present}` : ""}.` : "Not stated.";
@@ -104,7 +104,7 @@ export function buyerReply2(c: Ctx, asks: readonly string[], slots: readonly str
 
 export function supplierReply2(p: SupplierProfile, c: Ctx, slot: string | null): { text: string; data: Record<string, unknown> } {
   const who = p.attendees[0];
-  const text = [banner(p), "", slot ? `Confirmed: ${slot}${p.stand ? ` at ${p.stand}` : ""}${who ? ` with ${who.name} (${who.role})` : ""}.` : "We will confirm the slot shortly.",
+  const text = [banner(p), slot ? `Confirmed: ${slot}${p.stand ? ` at ${p.stand}` : ""}${who ? ` with ${who.name} (${who.role})` : ""}.` : "We will confirm the slot shortly.",
     p.bringing.length ? `We will have: ${p.bringing.join("; ")}.` : "", "We will bring our NDA template; gated topics are covered after signing.", "Commercial terms are given on site, not by email.", "", `Supplier agent for ${c.supplier}`].filter(Boolean).join("\n");
   return { text, data: { type: "PRE_EVENT_CONFIRM", slot, attendee: who?.name ?? null } };
 }

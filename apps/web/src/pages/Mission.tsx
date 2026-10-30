@@ -12,6 +12,20 @@ function Dot({ status }: { status: string }) {
   return <span className={`mt-1.5 inline-block h-3 w-3 shrink-0 rounded-full ${c}`} />;
 }
 
+function Thought({ step }: { step: Row }) {
+  const d = step.detail as Row;
+  const text = String(d.text ?? "");
+  const fresh = Date.now() - Date.parse(String(step.created_at)) < 20000;
+  const [n, setN] = useState(fresh ? 0 : text.length);
+  useEffect(() => { if (n >= text.length) return; const t = setTimeout(() => setN((x) => Math.min(text.length, x + 2)), 16); return () => clearTimeout(t); }, [n, text.length]);
+  return (
+    <div className="rounded-lg border border-violet-500/40 bg-violet-500/10 p-3">
+      <div className="mb-1 flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-violet-300"><span>🧠 {step.title}</span><Badge value={d.by === "LLM" ? "AI REASONING · NUMBERS VERIFIED" : "RULE-BASED REASONING"} tone={d.by === "LLM" ? "violet" : "grey"} />{d.note && <span className="normal-case text-muted">{d.note}</span>}</div>
+      <p className="text-[13px] italic leading-relaxed text-slate-200">{text.slice(0, n)}{n < text.length && <span className="animate-pulse">▍</span>}</p>
+    </div>
+  );
+}
+
 function useBlobUrl(path: string | null): string | null {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
@@ -97,10 +111,10 @@ function DealBanner({ data }: { data: Row }) {
   return (
     <div className="rounded-xl border-2 border-emerald-400/60 bg-gradient-to-r from-emerald-500/25 to-emerald-500/5 p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div><div className="text-2xl font-extrabold tracking-wide text-emerald-300">DEAL CLOSED</div><div className="text-sm">{d.deal_ref} · {d.total_value != null ? `${d.total_value.toLocaleString()} ${d.currency}` : "value unknown"}{sandbox ? " · SANDBOX simulation" : ""}</div></div>
+        <div><div className="text-2xl font-extrabold tracking-wide text-emerald-300">DEAL CLOSED</div><div className="flex items-center gap-2 text-sm">{d.deal_ref} · {d.total_value != null ? `${d.total_value.toLocaleString()} ${d.currency}` : "value unknown"}{sandbox && <Badge value="SANDBOX" tone="amber" />}</div></div>
         <div className="flex items-center gap-6 text-center"><div><div className="text-3xl font-bold tabular-nums">{d.humanApprovals}</div><div className="text-[11px] uppercase tracking-wider text-muted">human approvals</div></div><div><div className="text-3xl font-bold tabular-nums">{d.pendingApprovals}</div><div className="text-[11px] uppercase tracking-wider text-muted">in approval queue</div></div><Btn tone="primary" onClick={() => void open()}>Open deal PDF</Btn></div>
       </div>
-      {sandbox && <div className="mt-2 text-xs text-amber-200">Real public company data and real specifications; the supplier side is a simulated agent with an operator-entered mandate. Not a signed contract.</div>}
+      {sandbox && <div className="mt-2 text-xs text-muted">Sandbox run: the supplier agent acts on a mandate entered by the operator. A recorded acceptance, not a signed contract.</div>}
       <details className="mt-3 text-xs"><summary className="cursor-pointer text-muted">Ledger ({(d.ledger as Row[]).length} entries)</summary><ul className="mt-2 space-y-0.5 text-muted">{(d.ledger as Row[]).map((l, i) => <li key={i}>{fmtTime(l.created_at)?.split(", ")[1]} · {l.action} · {l.summary}</li>)}</ul></details>
     </div>
   );
@@ -121,12 +135,13 @@ function RepPhone({ id, onSent }: { id: number; onSent: () => void }) {
   };
   const send = async (useDemoAssets: boolean, set: "thermal" | "drone" = "thermal") => { setBusy(true); setMsg(null); try { await api(`/missions/${id}/rep-reply`, { body: { note, files: useDemoAssets ? [] : files, useDemoAssets, set } }); setMsg("Reply sent by email. The agent is reading it…"); onSent(); } catch (e) { setMsg((e as Error).message); } finally { setBusy(false); } };
   return (
-    <Card title="📱 Salesperson's phone — reply to the agent's email">
-      <p className="mb-2 text-xs text-muted">The salesperson is only a camera. This sends a real email from their address with the photo and the spec. A normal mail client replying to the same subject works too.</p>
+    <Card title="📱 Reply as the salesperson">
+      <p className="mb-2 text-xs text-muted">The salesperson is only a camera: attach your photo and the spec. This sends a real email from their address; replying from any mail client to the same subject works too.</p>
       <input type="file" multiple accept="image/*,.pdf,.txt" onChange={(e) => void pick(e.target.files)} />
       {files.length > 0 && <div className="mt-1 text-[11px] text-muted">{files.map((f) => f.name).join(", ")}</div>}
       <textarea className="mt-2" rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
-      <div className="mt-2 flex flex-wrap items-center gap-2"><Btn tone="primary" disabled={busy || (!files.length && !note.trim())} onClick={() => void send(false)}>Send reply</Btn><Btn disabled={busy} onClick={() => void send(true, "thermal")}>Prepared reply: thermal camera</Btn><Btn disabled={busy} onClick={() => void send(true, "drone")}>Prepared reply: drone</Btn>{msg && <span className="text-xs text-muted">{msg}</span>}</div>
+      <div className="mt-2 flex flex-wrap items-center gap-2"><Btn tone="primary" disabled={busy || (!files.length && !note.trim())} onClick={() => void send(false)}>Send reply</Btn>{msg && <span className="text-xs text-muted">{msg}</span>}</div>
+      <details className="mt-3 text-xs text-muted"><summary className="cursor-pointer">Fallback files (watermarked fixtures)</summary><div className="mt-2 flex gap-2"><Btn disabled={busy} onClick={() => void send(true, "thermal")}>Thermal camera set</Btn><Btn disabled={busy} onClick={() => void send(true, "drone")}>Drone set</Btn></div></details>
     </Card>
   );
 }
@@ -147,7 +162,9 @@ function MissionView({ id, onContinue }: { id: number; onContinue: (id: number) 
         {m.data.deal && <DealBanner data={m.data} />}
         <Card title={<span>Agent timeline <Badge value={status} /></span>}>
           <ol className="relative space-y-4 border-l border-edge pl-6">
-            {steps.map((s) => (
+            {steps.map((s) => s.kind === "think" ? (
+              <li key={s.id} className="relative animate-[fadein_.4s_ease]"><span className="absolute -left-[31px] top-1 inline-block h-3 w-3 rounded-full bg-violet-400" /><Thought step={s} /></li>
+            ) : (
               <li key={s.id} className="relative animate-[fadein_.4s_ease]">
                 <span className="absolute -left-[31px] top-0"><Dot status={s.status} /></span>
                 <div className="flex items-baseline justify-between gap-3"><div className={`font-medium ${s.status === "ERROR" ? "text-red-300" : ""}`}>{s.title}</div><div className="shrink-0 text-[11px] text-muted">{fmtTime(s.created_at)?.split(", ")[1]}</div></div>
@@ -170,7 +187,7 @@ const SUGGEST: Record<string, Record<string, string>> = {
 function Setup({ onDone, setup }: { onDone: () => void; setup: Row }) {
   const [profile, setProfile] = useState<"default" | "drone">("default");
   const init = (p: "default" | "drone"): Record<string, string> => {
-    const m = setup.mandates?.[p]; const sg = SUGGEST[p]!;
+    const m = setup.mandates?.[p]; const sg: Record<string, string> = { b_currency: "EUR", b_pay: "net30,net45", s_pay: "net30", s_del: "DAP", s_valid: "14", b_max: "", b_lead: "", s_min: "", s_open: "", s_lead: "" };
     return { legalName: setup.company?.name ?? "", country: setup.company?.country ?? "PL", repName: setup.rep?.name ?? "", repEmail: setup.rep?.email ?? "", deliveryLocation: setup.deliveryLocation ?? "Warsaw, Poland",
       b_currency: m?.buyer.currency ?? sg.b_currency!, b_max: String(m?.buyer.max_unit_price ?? sg.b_max), b_lead: String(m?.buyer.max_lead_time_days ?? sg.b_lead), b_pay: m?.buyer.allowed_payment_terms ?? sg.b_pay!,
       s_min: String(m?.supplier.min_unit_price ?? sg.s_min), s_open: String(m?.supplier.opening_unit_price ?? sg.s_open), s_lead: String(m?.supplier.opening_lead_time_days ?? sg.s_lead), s_pay: m?.supplier.opening_payment_terms ?? sg.s_pay!, s_del: m?.supplier.opening_delivery_terms ?? sg.s_del!, s_valid: String(m?.supplier.opening_validity_days ?? sg.s_valid) };
@@ -178,7 +195,7 @@ function Setup({ onDone, setup }: { onDone: () => void; setup: Row }) {
   const [f, setF] = useState<Record<string, string>>(init("default"));
   const [err, setErr] = useState<string | null>(null);
   const switchTo = (p: "default" | "drone") => { setProfile(p); setF((cur) => ({ ...init(p), legalName: cur.legalName ?? "", country: cur.country ?? "PL", repName: cur.repName ?? "", repEmail: cur.repEmail ?? "", deliveryLocation: cur.deliveryLocation ?? "" })); };
-  const set = (k: string) => ({ value: String(f[k] ?? ""), onChange: (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value }) });
+  const set = (k: string) => ({ value: String(f[k] ?? ""), placeholder: SUGGEST[profile]?.[k] ? `e.g. ${SUGGEST[profile]![k]}` : "", onChange: (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value }) });
   const saved = (p: string) => !!setup.mandates?.[p];
   const save = async () => {
     try {
@@ -190,7 +207,7 @@ function Setup({ onDone, setup }: { onDone: () => void; setup: Row }) {
   };
   return (
     <Card title="Demo setup — mandates the agents may act within (entered once, before the show)">
-      <div className="mb-4 flex flex-wrap items-center gap-2">{([["default", "Thermal camera / default mandates"], ["drone", "Military drone mandates"]] as const).map(([k, l]) => <button key={k} onClick={() => switchTo(k)} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${profile === k ? "bg-accent text-black" : "border border-edge text-slate-300"}`}>{l} {saved(k) ? "✓" : ""}</button>)}<span className="text-[11px] text-muted">Each profile has its own price scale. Values shown are editable suggestions until you save.</span></div>
+      <div className="mb-4 flex flex-wrap items-center gap-2">{([["default", "Thermal camera / default mandates"], ["drone", "Military drone mandates"]] as const).map(([k, l]) => <button key={k} onClick={() => switchTo(k)} className={`rounded-md px-3 py-1.5 text-sm font-semibold ${profile === k ? "bg-accent text-black" : "border border-edge text-slate-300"}`}>{l} {saved(k) ? "✓" : ""}</button>)}<span className="text-[11px] text-muted">Each profile has its own price scale. Grey hints are examples only.</span></div>
       <div className="grid gap-5 lg:grid-cols-3">
         <div className="space-y-2"><div className="text-xs font-semibold uppercase text-accent">Your company &amp; salesperson (shared)</div>
           <Field label="Your company (buyer)"><input {...set("legalName")} /></Field><Field label="Country (ISO-2)"><input {...set("country")} /></Field><Field label="Delivery location"><input {...set("deliveryLocation")} /></Field>
@@ -275,7 +292,7 @@ export function Mission() {
         </>
       ) : (
         <div className="rounded-lg border border-dashed border-edge p-10 text-center text-muted">Run the agent to see its work here. <Link className="text-accent underline" to="/events">Events</Link> must be researched first.
-          {(missions.data ?? []).length > 0 && <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs"><span>Previous runs:</span>{(missions.data ?? []).slice(0, 8).map((x) => <button key={x.id} onClick={() => setSel(x.id)} className="rounded border border-edge px-2 py-0.5 hover:border-accent hover:text-accent">#{x.id} · {x.status.replace(/_/g, " ").toLowerCase()}</button>)}</div>}</div>
+          {(missions.data ?? []).length > 0 && <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs"><span>Previous runs:</span><button className="rounded border border-edge px-2 py-0.5 hover:border-red-400 hover:text-red-300" onClick={() => void api("/missions/archive-all", { body: {} }).then(() => missions.reload())}>hide all</button>{(missions.data ?? []).slice(0, 8).map((x) => <button key={x.id} onClick={() => setSel(x.id)} className="rounded border border-edge px-2 py-0.5 hover:border-accent hover:text-accent">#{x.id} · {x.status.replace(/_/g, " ").toLowerCase()}</button>)}</div>}</div>
       )}
     </div>
   );

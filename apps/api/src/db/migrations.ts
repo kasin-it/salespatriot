@@ -956,4 +956,5 @@ CREATE TABLE supplier_profiles (
 );
 `,
   },
+  { id: 8, name: "mission_archive", sql: `ALTER TABLE missions ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;` },
 ];

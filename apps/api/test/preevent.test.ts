@@ -18,7 +18,7 @@ test("buyer intro asks the five questions and admits what is not public", () => 
 test("supplier agent answers only from the profile; gated topics are 'on site only'; banner marks it simulated", () => {
   const r = supplierReply1(profile, ctx, ["attendees", "stand", "showing", "shareable_now", "meeting_slot"]);
   assert.match(r.text, /SANDBOX — simulated supplier agent/);
-  assert.match(supplierReply1({ ...profile, own_company: 1 }, ctx, ["stand"]).text, /operator's own demo company/);
+  assert.ok(!/SANDBOX/.test(supplierReply1({ ...profile, own_company: 1 }, ctx, ["stand"]).text), "the operator's own company needs no simulated-agent banner");
   assert.ok(!/o\.\.\./.test(buyerIntro({ ...ctx, buyer: "Foo Sp. z o.o." }).text), "no double period after company names");
   assert.match(r.text, /Alex Test \(CEO\)/);
   assert.match(r.text, /technical specification \(NDA, on site\)/);

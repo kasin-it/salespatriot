@@ -673,7 +673,9 @@ api.post("/missions", async (c) => {
   const taskId = enqueueTask("buyer_agent", "mission.run", { missionId: id, preevent: b.preevent, field: b.field ? { ...b.field, standHint: b.field.standHint ?? null, quantity: b.field.quantity ?? null } : undefined }, `user:${uid(c)}`, { companyId: cfg.buyerCompanyId, priority: 1 });
   return c.json({ id, taskId }, 201);
 });
-api.get("/missions", (c) => { const mine = userCompanyIds(uid(c)).join(",") || "0"; return c.json(db().all(`SELECT id, kind, prompt, status, created_at FROM missions WHERE company_id IN (${mine}) ORDER BY id DESC LIMIT 20`)); });
+api.get("/missions", (c) => { const mine = userCompanyIds(uid(c)).join(",") || "0"; return c.json(db().all(`SELECT id, kind, prompt, status, created_at FROM missions WHERE archived=0 AND company_id IN (${mine}) ORDER BY id DESC LIMIT 20`)); });
+// Hides earlier runs from the start screen; nothing is deleted.
+api.post("/missions/archive-all", (c) => { const mine = userCompanyIds(uid(c)).join(",") || "0"; return c.json({ archived: db().run(`UPDATE missions SET archived=1 WHERE company_id IN (${mine})`).changes }); });
 api.get("/missions/:id", (c) => {
   const id = Number(c.req.param("id"));
   const m = db().get<Record<string, unknown> & { company_id: number; field_request_id: number | null; deal_id: number | null; negotiation_id: number | null }>("SELECT * FROM missions WHERE id=?", id);
