@@ -206,7 +206,7 @@ export function buildBriefing(requestId: number): { briefing: Briefing; startAut
       else if (!sp) neg = { id: null, decision: "No SANDBOX supplier mandate configured for the target; public companies are never impersonated" };
       else {
         const rfq = json<Record<string, unknown>>(r.rfq_terms, {});
-        const negId = db.insert("negotiations", { mode: "SANDBOX", buyer_company_id: r.company_id, supplier_company_id: r.target_company_id, origin_event_id: r.event_id, subject: `Field request ${r.stand_hint ?? ""} — product from event material`.trim(), state: "INITIAL_CONTACT", buyer_policy_snapshot: JSON.stringify(bp), supplier_policy_snapshot: JSON.stringify(sp) });
+        const negId = db.insert("negotiations", { mode: "SANDBOX", buyer_company_id: r.company_id, supplier_company_id: r.target_company_id, origin_event_id: r.event_id, subject: `${db.get<{ canonical_name: string }>("SELECT canonical_name FROM companies WHERE id=?", r.target_company_id)?.canonical_name ?? "Supplier"}${r.stand_hint ? ` (stand ${r.stand_hint})` : ""} — offer from event material`, state: "INITIAL_CONTACT", buyer_policy_snapshot: JSON.stringify(bp), supplier_policy_snapshot: JSON.stringify(sp) });
         db.insert("negotiation_transitions", { negotiation_id: negId, from_state: null, to_state: "INITIAL_CONTACT", actor: "agent:field", reason: "created from field reply" });
         db.update("field_requests", r.id, { negotiation_id: negId });
         neg = { id: negId, decision: "SANDBOX autopilot started (simulated supplier agent, mandate configured by the operator)" };

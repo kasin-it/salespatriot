@@ -10,7 +10,7 @@ const BEGIN = "---ARSENAL-OFFER-TERMS---";
 const END = "---END-ARSENAL-OFFER-TERMS---";
 
 export const offerSubject = (negId: number, version: number, kind: string, subject: string): string => `[NEG-${negId}-v${version}] ${kind}: ${subject}`;
-export const agentAddress = (side: "buyer" | "supplier"): string => `${side}-agent@arsenal.test`;
+export const agentAddress = (side: "buyer" | "supplier", company?: string): string => (company ? `agent.${company.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 28) || "supplier"}@arsenal.test` : `${side}-agent@arsenal.test`);
 
 export function offerBody(a: { fromName: string; toName: string; kind: string; version: number; previousVersion: number | null; terms: OfferTerms; rationale?: string | null; mode: string }): string {
   const t = a.terms;
@@ -27,11 +27,13 @@ export function offerBody(a: { fromName: string; toName: string; kind: string; v
 
 export async function sendOfferEmail(a: { negId: number; version: number; kind: string; subject: string; from: "buyer" | "supplier"; fromName: string; toName: string; terms: OfferTerms; previousVersion: number | null; rationale?: string | null; mode: string }): Promise<string> {
   const t = nodemailer.createTransport({ host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT ?? 587), secure: process.env.SMTP_SECURE === "true" });
-  const to = agentAddress(a.from === "buyer" ? "supplier" : "buyer");
+  const supplierName = a.from === "supplier" ? a.fromName : a.toName;
+  const to = agentAddress(a.from === "buyer" ? "supplier" : "buyer", a.from === "buyer" ? supplierName : undefined);
+  const fromAddr = agentAddress(a.from, a.from === "supplier" ? supplierName : undefined);
   const subject = offerSubject(a.negId, a.version, a.kind, a.subject);
   const text = offerBody({ ...a, mode: a.mode });
-  const info = await t.sendMail({ from: agentAddress(a.from), to, subject, text });
-  logAgentEmail({ kind: "offer", from: agentAddress(a.from), to, subject, body: text.replace(/\n*Machine-readable terms[\s\S]*$/, "") });
+  const info = await t.sendMail({ from: fromAddr, to, subject, text });
+  logAgentEmail({ kind: "offer", from: fromAddr, to, subject, body: text.replace(/\n*Machine-readable terms[\s\S]*$/, "") });
   return info.messageId;
 }
 
@@ -59,11 +61,13 @@ const BLOCK_BEGIN = "---ARSENAL-AGENT-DATA---";
 const BLOCK_END = "---END-ARSENAL-AGENT-DATA---";
 export const withBlock = (text: string, data: unknown): string => `${text}\n\n(Machine-readable block for the receiving agent)\n${BLOCK_BEGIN}\n${JSON.stringify(data)}\n${BLOCK_END}`;
 
-export async function sendAgentEmail(a: { subject: string; from: "buyer" | "supplier"; text: string }): Promise<void> {
+/** `company` gives the supplier-side agent its own address, so a thread with each exhibitor is a separate conversation. */
+export async function sendAgentEmail(a: { subject: string; from: "buyer" | "supplier"; text: string; company?: string }): Promise<void> {
   const t = nodemailer.createTransport({ host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT ?? 587), secure: process.env.SMTP_SECURE === "true" });
-  const to = agentAddress(a.from === "buyer" ? "supplier" : "buyer");
-  await t.sendMail({ from: agentAddress(a.from), to, subject: a.subject, text: a.text });
-  logAgentEmail({ kind: "pre_event", from: agentAddress(a.from), to, subject: a.subject, body: a.text.replace(/\n*\(Machine-readable block[\s\S]*$/, "") });
+  const addr = (side: "buyer" | "supplier") => agentAddress(side, side === "supplier" ? a.company : undefined);
+  const from = addr(a.from); const to = addr(a.from === "buyer" ? "supplier" : "buyer");
+  await t.sendMail({ from, to, subject: a.subject, text: a.text });
+  logAgentEmail({ kind: "pre_event", from, to, subject: a.subject, body: a.text.replace(/\n*\(Machine-readable block[\s\S]*$/, "") });
 }
 
 /** Reads one agent email back from the mailbox by subject tag and returns its parsed data block. */

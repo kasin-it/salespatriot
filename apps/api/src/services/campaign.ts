@@ -4,7 +4,7 @@ import { errorMessage, now, sleep } from "../lib/util.ts";
 import { enqueueTask, type TaskContext } from "../agents/orchestrator.ts";
 import { demandForCategory } from "./demand.ts";
 import { logAgentEmail } from "./emaillog.ts";
-import { mailboxReady, readAgentEmail, sendAgentEmail, withBlock } from "./mailneg.ts";
+import { agentAddress, mailboxReady, readAgentEmail, sendAgentEmail, withBlock } from "./mailneg.ts";
 import { addStep, getDemoConfig, parseRequest, planStands, profileFor, rankEvents, setMission, specificTokens, type StandCandidate } from "./mission.ts";
 import { loadProfile, publicKnowledge, runPreEventConversation, type Ctx } from "./preevent.ts";
 import { think } from "./think.ts";
@@ -22,14 +22,14 @@ export interface PublicFacts {
   capabilities: { label: string; cls: string; evidence: string; source: string | null }[]; certifications: string[]; awards: { evidence: string; url: string | null }[];
 }
 
-export function publicFacts(companyId: number, eventId: number): PublicFacts {
+export function publicFacts(companyId: number, eventId: number, categoryKey?: string | null): PublicFacts {
   const db = getDb();
   const c = db.get<{ canonical_name: string; country: string | null; website: string | null }>("SELECT canonical_name, country, website FROM companies WHERE id=?", companyId)!;
   const x = db.get<{ booth: string | null; description: string | null; categories: string | null }>("SELECT booth, description, categories FROM event_exhibitors WHERE event_id=? AND company_id=? LIMIT 1", eventId, companyId);
-  const caps = db.all<{ label: string; capability_class: string; evidence_text: string; source_url: string | null; source_type: string }>("SELECT label, capability_class, evidence_text, source_url, source_type FROM company_capabilities WHERE company_id=? ORDER BY capability_class", companyId);
+  const caps = db.all<{ label: string; capability_class: string; evidence_text: string; source_url: string | null; source_type: string; category_key: string | null }>("SELECT label, capability_class, evidence_text, source_url, source_type, category_key FROM company_capabilities WHERE company_id=? ORDER BY capability_class", companyId).filter((k) => !categoryKey || !k.category_key || k.category_key === categoryKey);
   return {
     name: c.canonical_name, country: c.country, website: c.website, stand: x?.booth ?? null, categories: json<string[]>(x?.categories ?? null, []), description: x?.description ?? null,
-    capabilities: caps.filter((k) => k.source_type !== "PROCUREMENT_PORTAL").map((k) => ({ label: k.label, cls: k.capability_class, evidence: k.evidence_text, source: k.source_url })),
+    capabilities: caps.filter((k) => k.source_type !== "PROCUREMENT_PORTAL" && !caps.some((o, i) => o !== k && o.label === k.label && i < caps.indexOf(k))).map((k) => ({ label: k.label, cls: k.capability_class, evidence: k.evidence_text, source: k.source_url })),
     certifications: db.all<{ name: string }>("SELECT DISTINCT name FROM company_certifications WHERE company_id=?", companyId).map((r) => r.name),
     awards: caps.filter((k) => k.source_type === "PROCUREMENT_PORTAL").map((k) => ({ evidence: k.evidence_text, url: k.source_url })),
   };
@@ -70,18 +70,22 @@ async function converse(missionId: number, tag: string, ctx: Ctx, f: PublicFacts
     const body = withBlock(text, data);
     let emailed = false; let readBack = false;
     if (useMail) {
-      try { await sendAgentEmail({ subject: `[PRE-${tag}-${n}] ${subject}`, from, text: body }); emailed = true; readBack = !!(await readAgentEmail(`[PRE-${tag}-${n}]`)); } catch (e) { void errorMessage(e); }
+      try { await sendAgentEmail({ subject: `[PRE-${tag}-${n}] ${subject}`, from, text: body, company: f.name }); emailed = true; readBack = !!(await readAgentEmail(`[PRE-${tag}-${n}]`)); } catch (e) { void errorMessage(e); }
     }
     addStep(missionId, "mail", `${from === "buyer" ? "Buyer agent → Public-record agent" : "Public-record agent → Buyer agent"}: ${subject}`, "DONE", { n, from, subject: `[PRE-${tag}-${n}] ${subject}`, text: body, emailed, readBack, supplier: f.name });
     await sleep(pace);
   };
+  const buyer = ctx.buyer.replace(/\.+$/, "");
   const subject = `Meeting at ${ctx.event}? Looking for ${ctx.product}`;
   const need = `${ctx.quantity ? `${ctx.quantity} × ` : ""}${ctx.product}${ctx.deadline ? `, needed by ${ctx.deadline}` : ""}`;
-  await sendAndRead(1, "buyer", subject, ["Hello,", "", `I am the procurement agent of ${ctx.buyer.replace(/\.+$/, "")}. We are looking for ${need}.`, `Ahead of ${ctx.event}${ctx.dates ? ` (${ctx.dates})` : ""} I would like to know: who will be on site, where your stand is, what you show, what is public and what is only available on site, and a meeting slot.`, "", `Buyer agent for ${ctx.buyer.replace(/\.+$/, "")}`].join("\n"), { type: "PRE_EVENT_QUESTIONS", questions: ["attendees", "stand", "showing", "shareable_now", "meeting_slot"] });
+  await sendAndRead(1, "buyer", subject, ["Hello,", "", `I am the procurement agent of ${buyer}. We are looking for ${need}, delivery to ${ctx.deliveryLocation ?? "our site"}.`, `Ahead of ${ctx.event}${ctx.dates ? ` (${ctx.dates})` : ""} I would like to know: who will be on site, where your stand is, what you show, what is public and what is only available on site, and a meeting slot.`, "", `Buyer agent for ${buyer}`].join("\n"), { type: "PRE_EVENT_QUESTIONS", questions: ["attendees", "stand", "showing", "shareable_now", "meeting_slot"] });
   const r = publicRecordReply(f, ctx);
   await sendAndRead(2, "supplier", `Re: ${subject}`, r.text, r.data);
-  await sendAndRead(3, "buyer", `Re: ${subject}`, [`Thank you. I will treat ${f.name} as ${f.stand ? `a stand to visit (${f.stand})` : "a stand to look up"} and ask my colleague on site for: attendees, specification, price and lead time, availability.`, "", `Buyer agent for ${ctx.buyer.replace(/\.+$/, "")}`].join("\n"), { type: "PRE_EVENT_ACK", open: ["attendees", "specification", "price and lead time", "availability"] });
-  return { turns: 3 };
+  const known = [f.stand ? `stand ${f.stand}` : null, f.categories.length ? `listed under “${f.categories[0]}”` : null, f.website ? "official website" : null].filter(Boolean).join(", ");
+  await sendAndRead(3, "buyer", `Re: ${subject}`, [`Thank you — that is useful (${known || "listing only"}).`, `Two questions that decide whether a meeting is worth it, even if only answerable with published sources: do you publish a datasheet or product page for ${ctx.product}, and do you state export-licence or certification requirements for defence customers?`, "", `Buyer agent for ${buyer}`].join("\n"), { type: "PRE_EVENT_FOLLOWUP", questions: ["datasheet_url", "export_or_certification"] });
+  await sendAndRead(4, "supplier", `Re: ${subject}`, [BANNER_PUBLIC(f.name), "", `Datasheet / product page: ${f.website ? `only the company website is on record (${f.website}); no specific datasheet URL is stored` : "none on record"}.`, `Certifications / export: ${f.certifications.length ? `the site mentions ${f.certifications.slice(0, 3).join(", ")} (a claim, not verified)` : "nothing published in the sources I hold"}.`, "I cannot commit to specifications, prices or meetings — I am not authorised by the company. Those have to come from a person at the stand.", "", `Public-record agent for ${f.name}`].join("\n"), { type: "PUBLIC_RECORD_ANSWERS", unknown: ["datasheet", "export licence", "price and lead time"] });
+  await sendAndRead(5, "buyer", `Re: ${subject}`, [`Understood. Plan: ${f.name} goes on my shortlist as ${f.stand ? `a stand to visit (${f.stand})` : "a stand to look up"}. My colleague on site will ask for: attendees, datasheet, export/certification status, price and lead time, availability. I will not assume any of these before the stand confirms them.`, "", `Buyer agent for ${buyer}`].join("\n"), { type: "PRE_EVENT_ACK", open: ["attendees", "datasheet", "export or certification status", "price and lead time", "availability"] });
+  return { turns: 5 };
 }
 
 export interface ShortlistItem { companyId: number; name: string; booth: string | null; score: number; why: string[]; unknown: string[]; mode: "OPERATOR_PROFILE" | "PUBLIC_RECORD"; evidence: string; tag: string }
@@ -118,7 +122,7 @@ export async function investigate(ctx: TaskContext, missionId: number): Promise<
       const c = cands[k]!;
       if (ctx.isCancelled()) break;
       ctx.progress(`Writing to ${c.name} (${k + 1}/${cands.length})`);
-      const f = publicFacts(c.companyId!, ev.id);
+      const f = publicFacts(c.companyId!, ev.id, parsed.categoryKey);
       const profile = loadProfile(c.companyId!);
       const cx: Ctx = { buyer, supplier: f.name, event: ev.name, dates, product: parsed.product, quantity: parsed.quantity, deadline: parsed.deadline, startup: false, known: [], deliveryLocation: cfg.deliveryLocation };
       const tag = `${missionId}-${k + 1}`;
@@ -210,8 +214,8 @@ export async function sendFollowups(userId: number, missionId: number): Promise<
   for (const d of drafts) {
     const subject = `[POST-${d.tag}] ${d.subject}`;
     try {
-      if (mailboxReady()) await sendAgentEmail({ subject, from: "buyer", text: d.body });
-      logAgentEmail({ kind: "followup", from: "buyer-agent@arsenal.test", to: "supplier-agent@arsenal.test", subject, body: d.body, missionId });
+      if (mailboxReady()) await sendAgentEmail({ subject, from: "buyer", text: d.body, company: d.name });
+      logAgentEmail({ kind: "followup", from: agentAddress("buyer"), to: agentAddress("supplier", d.name), subject, body: d.body, missionId });
       addStep(missionId, "followup", `Follow-up to ${d.name}: ${d.subject}`, "DONE", { ...d, subject });
       sent++;
     } catch (e) { addStep(missionId, "followup", `Follow-up to ${d.name} failed: ${errorMessage(e)}`, "ERROR"); }

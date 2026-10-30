@@ -150,7 +150,7 @@ export async function runPreEventConversation(missionId: number, ctx: Ctx, profi
     let readBack = false; let emailed = false; let parsed: Record<string, unknown> | null = data;
     if (useMail) {
       try {
-        await sendAgentEmail({ subject: `${base}${n}] ${subject}`, from, text: body }); emailed = true;
+        await sendAgentEmail({ subject: `${base}${n}] ${subject}`, from, text: body, company: ctx.supplier }); emailed = true;
         const got = await readAgentEmail(`${base}${n}]`);
         if (got?.data) { readBack = true; parsed = got.data; }
       } catch (e) { void errorMessage(e); }
