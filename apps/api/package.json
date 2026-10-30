@@ -1,0 +1,31 @@
+{
+  "name": "@salespatriot/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch --env-file-if-exists=.env src/main.ts",
+    "start": "node --env-file-if-exists=.env src/main.ts",
+    "worker": "node --env-file-if-exists=.env src/worker.ts",
+    "migrate": "node --env-file-if-exists=.env src/db/migrate-cli.ts",
+    "build": "tsc --noEmit -p .",
+    "typecheck": "tsc --noEmit -p .",
+    "test": "node --test --test-concurrency=1 'test/**/*.test.ts'",
+    "test:live": "LIVE=1 node --test --test-concurrency=1 'test/live/*.test.ts'"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.5",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@salespatriot/shared": "workspace:*",
+    "hono": "^4.13.14",
+    "linkedom": "^0.18.14",
+    "nodemailer": "10.1.7",
+    "unpdf": "1.9.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@salespatriot/typescript-config": "workspace:*",
+    "@types/node": "^26.6.6",
+    "@types/nodemailer": "*"
+  }
+}

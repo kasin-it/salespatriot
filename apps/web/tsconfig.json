@@ -1,0 +1,12 @@
+{
+  "extends": "@salespatriot/typescript-config/base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "jsx": "react-jsx",
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "types": ["vite/client"]
+  },
+  "include": ["src"]
+}

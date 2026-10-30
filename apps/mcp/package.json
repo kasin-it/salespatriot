@@ -1,0 +1,14 @@
+{
+  "name": "@salespatriot/mcp",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": { "arsenal-mcp": "./src/server.ts" },
+  "scripts": {
+    "start": "node src/server.ts",
+    "build": "tsc --noEmit -p .",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": { "@modelcontextprotocol/sdk": "^1.32.2", "zod": "^4.6.7" },
+  "devDependencies": { "@salespatriot/typescript-config": "workspace:*", "@types/node": "^26.6.6" }
+}

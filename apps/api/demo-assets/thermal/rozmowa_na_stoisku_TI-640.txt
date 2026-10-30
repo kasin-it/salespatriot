@@ -1,0 +1,19 @@
+[DEMO FIXTURE — wymyślony produkt i producent; transkrypcja rozmowy na stoisku (przykład wyniku STT)]
+
+Handlowiec (nasz): Dzień dobry, jestem z działu zakupów. Szukamy kamer termowizyjnych, około dwustu sztuk do pierwszego kwartału.
+Przedstawiciel stoiska: Dzień dobry, świetnie trafił Pan na nasze stoisko. To jest TI-640, ręczna kamera termowizyjna, matryca sześćset czterdzieści na pięćset dwanaście.
+Handlowiec: Jaki zasięg wykrywania?
+Przedstawiciel: Człowiek do około 1,8 kilometra. Czułość poniżej 40 milikelwinów, więc obraz jest czysty także we mgle i w dymie.
+Handlowiec: Jak z wytrzymałością?
+Przedstawiciel: IP67, sześćset pięćdziesiąt gramów z baterią, cztery godziny pracy, od minus trzydziestu do plus pięćdziesięciu pięciu stopni.
+Handlowiec: Certyfikaty?
+Przedstawiciel: ISO 9001 oraz AQAP 2110. Gwarancja dwadzieścia cztery miesiące.
+Handlowiec: A cena przy dwustu sztukach?
+Przedstawiciel: Przy zamówieniu od dwustu sztuk tysiąc sto osiemdziesiąt euro za sztukę. Minimalne zamówienie to pięćdziesiąt sztuk.
+Handlowiec: Termin dostawy?
+Przedstawiciel: Sześć tygodni od zamówienia.
+Handlowiec: Warunki płatności i dostawy?
+Przedstawiciel: To ustalamy indywidualnie, proszę przesłać zapytanie ofertowe, odpowiemy z wyceną.
+Handlowiec: Czy są ograniczenia eksportowe?
+Przedstawiciel: To towar podwójnego zastosowania, licencja eksportowa zależy od kraju przeznaczenia.
+Handlowiec: Dziękuję, zrobię zdjęcie ulotki i wezmę specyfikację oraz prezentację.

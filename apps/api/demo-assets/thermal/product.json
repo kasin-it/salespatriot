@@ -1,0 +1,19 @@
+{
+  "illustration": "camera",
+  "manufacturer": "DEMO OPTRONICS",
+  "model": "TI-640",
+  "title": "TI-640 Thermal Imaging Camera",
+  "photoFile": "photo_flyer_TI-640.png",
+  "specFile": "spec_TI-640.pdf",
+  "presentationFile": "presentation_TI-640.pdf",
+  "flyerRows": ["Unit price: 1180 EUR (200+ pcs)", "Lead time: 6 weeks", "MOQ: 50 pcs", "Sensor: 640 x 512, 12 um", "NETD: < 40 mK", "Detection range: 1.8 km (human)", "IP67 · 650 g · -30..+55 C", "ISO 9001:2015 · AQAP 2110", "Warranty: 24 months"],
+  "specRows": [["Product", "TI-640 handheld thermal imaging camera"], ["Detector", "Uncooled VOx microbolometer, 640 x 512, 12 um pitch"], ["Thermal sensitivity (NETD)", "< 40 mK"], ["Lens", "25 mm, f/1.0, FOV 17.5 x 14 deg"], ["Detection range (human target)", "1.8 km"], ["Frame rate", "30 Hz"], ["Display", "1280 x 960 OLED"], ["Recording", "1080p video, JPEG stills"], ["Interfaces", "USB-C, HDMI, Wi-Fi"], ["Weight", "650 g incl. battery"], ["Battery life", "4 h continuous"], ["Environmental", "IP67, -30 to +55 C"], ["Quality management", "ISO 9001:2015, AQAP 2110"], ["Warranty", "24 months"]],
+  "commercial": ["Unit price: 1180 EUR for orders of 200 pieces or more", "Lead time: 6 weeks from order", "Minimum order quantity: 50 pieces", "Offer valid for 14 days"],
+  "exportNote": "Export: dual-use item, export licence to be confirmed per destination.",
+  "slides": [
+    {"title": "TI-640 — see in total darkness", "bullets": ["Handheld thermal imaging camera by Demo Optronics", "Uncooled 640 x 512 sensor, detection of a human target up to 1.8 km", "Built for border security, perimeter protection and field patrols"]},
+    {"title": "Why the TI-640", "bullets": ["NETD below 40 mK: clear image in smoke, fog and light rain", "650 g, 4 h battery, IP67, works from -30 to +55 C", "1080p recording and Wi-Fi streaming to a command post"]},
+    {"title": "Quality and compliance", "bullets": ["Manufactured under ISO 9001:2015 and AQAP 2110", "24-month warranty", "Dual-use item: export licence confirmed per destination"]},
+    {"title": "Commercial offer", "bullets": ["Unit price 1180 EUR for orders of 200 pieces or more", "Lead time 6 weeks, MOQ 50 pieces", "Offer valid for 14 days — payment and delivery terms agreed per order"]}
+  ]
+}

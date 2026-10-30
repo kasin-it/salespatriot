@@ -1,0 +1,14 @@
+{
+  "extends": "@salespatriot/typescript-config/base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "erasableSyntaxOnly": true,
+    "rewriteRelativeImportExtensions": false,
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "types": ["node"],
+    "lib": ["es2024"]
+  },
+  "include": ["src"]
+}

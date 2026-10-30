@@ -1,0 +1,21 @@
+[DEMO FIXTURE — wymyślony produkt i producent; transkrypcja rozmowy na stoisku (przykład wyniku STT)]
+
+Handlowiec (nasz): Dzień dobry, jestem z działu zakupów. Szukamy dronów rozpoznawczych dla małych pododdziałów, około dziesięciu zestawów do drugiego kwartału.
+Przedstawiciel stoiska: Dzień dobry. To jest SK-4, taktyczny system bezzałogowy, czterowirnikowy VTOL.
+Handlowiec: Jak długo lata i jaki ma zasięg?
+Przedstawiciel: Czterdzieści pięć minut lotu, łącze zaszyfrowane AES-256 do dziesięciu kilometrów. Baterie wymienia się w locie od ręki.
+Handlowiec: Co jest na pokładzie?
+Przedstawiciel: Gimbal EO/IR: kamera dzienna 4K i termowizja sześćset czterdzieści na pięćset dwanaście. Nawigacja wizyjno-inercyjna, więc dron leci dalej, gdy ktoś zagłusza GPS.
+Handlowiec: Waga i odporność?
+Przedstawiciel: Cztery i osiem dziesiątych kilograma, wiatr do dwunastu metrów na sekundę, IP54. Jeden operator, całość w plecaku, gotowy do startu w trzy minuty.
+Handlowiec: Certyfikaty i gwarancja?
+Przedstawiciel: ISO 9001 oraz AQAP 2110. Gwarancja dwanaście miesięcy.
+Handlowiec: Cena przy dziesięciu zestawach?
+Przedstawiciel: Od dziesięciu zestawów czternaście tysięcy pięćset euro za system, w zestawie aparat, stacja kontrolna, dwie baterie, ładowarka i walizka. Minimalne zamówienie to pięć systemów.
+Handlowiec: Termin dostawy?
+Przedstawiciel: Dziesięć tygodni od zamówienia.
+Handlowiec: Warunki płatności i dostawy?
+Przedstawiciel: To ustalamy indywidualnie, proszę przesłać zapytanie ofertowe.
+Handlowiec: Ograniczenia eksportowe?
+Przedstawiciel: To sprzęt wojskowy i podwójnego zastosowania, licencja eksportowa zależy od kraju przeznaczenia.
+Handlowiec: Dziękuję, zrobię zdjęcie drona i wezmę specyfikację oraz prezentację.

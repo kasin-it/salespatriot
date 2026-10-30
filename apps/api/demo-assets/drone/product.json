@@ -1,0 +1,19 @@
+{
+  "illustration": "drone",
+  "manufacturer": "DEMO AEROSPACE",
+  "model": "SK-4",
+  "title": "SK-4 Tactical Reconnaissance UAS (military drone)",
+  "photoFile": "photo_flyer_SK-4.png",
+  "specFile": "spec_SK-4.pdf",
+  "presentationFile": "presentation_SK-4.pdf",
+  "flyerRows": ["Unit price: 14500 EUR per system (10+ systems)", "Lead time: 10 weeks", "MOQ: 5 systems", "Endurance: 45 min · Range: 10 km", "Payload: EO/IR gimbal, thermal 640 x 512", "MTOW 4.8 kg · wind 12 m/s · IP54", "Encrypted link AES-256", "ISO 9001:2015 · AQAP 2110", "Warranty: 12 months"],
+  "specRows": [["Product", "SK-4 tactical reconnaissance unmanned aerial system (UAS)"], ["Type", "Quadcopter VTOL multirotor military drone"], ["Endurance", "45 min (hot-swap batteries)"], ["Command and control range", "10 km, encrypted link AES-256"], ["Payload", "EO/IR gimbal: 4K day camera, thermal 640 x 512"], ["Max take-off weight", "4.8 kg"], ["Wind resistance", "12 m/s"], ["Navigation", "GNSS with visual-inertial fallback in GNSS-denied areas"], ["Operation", "One operator, backpack transport, ready in 3 min"], ["Environmental", "IP54, -20 to +50 C"], ["Ground control station", "Ruggedised tablet, 2 batteries included"], ["System set", "Aircraft, ground control station, 2 batteries, charger, case"], ["Quality management", "ISO 9001:2015, AQAP 2110"], ["Warranty", "12 months"]],
+  "commercial": ["Unit price: 14500 EUR per system for orders of 10 systems or more", "Lead time: 10 weeks from order", "Minimum order quantity: 5 systems", "Offer valid for 14 days"],
+  "exportNote": "Export: military/dual-use item, export licence required per destination (to be confirmed).",
+  "slides": [
+    {"title": "SK-4 — eyes in the air for the small unit", "bullets": ["Tactical reconnaissance UAS by Demo Aerospace", "Quadcopter VTOL: 45 min endurance, 10 km encrypted link", "One operator, backpack transport, airborne in 3 minutes"]},
+    {"title": "Payload and navigation", "bullets": ["EO/IR gimbal: 4K day camera and 640 x 512 thermal imager", "Visual-inertial navigation keeps flying when GNSS is jammed", "Hot-swap batteries, 12 m/s wind resistance, IP54"]},
+    {"title": "Quality and compliance", "bullets": ["Manufactured under ISO 9001:2015 and AQAP 2110", "12-month warranty", "Military/dual-use item: export licence required per destination"]},
+    {"title": "Commercial offer", "bullets": ["Unit price 14500 EUR per system for orders of 10 systems or more", "Lead time 10 weeks, MOQ 5 systems", "Offer valid for 14 days — payment and delivery terms agreed per order"]}
+  ]
+}
