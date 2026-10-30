@@ -10,6 +10,7 @@ import { parseTermsFromText } from "./communication.ts";
 import { dbPath } from "../db/db.ts";
 import { extractFromImage, visionConfigured, visionToText, type VisionResult } from "./vision.ts";
 import { demandForCategory } from "./demand.ts";
+import { logAgentEmail } from "./emaillog.ts";
 
 /**
  * Field requests: the agent writes to a person who is physically at the event and asks for a photo of the stand/product,
@@ -66,6 +67,7 @@ export async function sendFieldRequest(i: { companyId: number; repId: number; ev
   try {
     const t = nodemailer.createTransport({ host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT ?? 587), secure: process.env.SMTP_SECURE === "true", auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined });
     await t.sendMail({ from: process.env.SMTP_FROM, to: rep.email, subject: m.subject, text: m.body });
+    logAgentEmail({ kind: "field_request", from: process.env.SMTP_FROM!, to: rep.email, subject: m.subject, body: m.body, missionId: i.missionId ?? null });
     db.update("field_requests", id, { status: "REQUESTED", sent_at: now() });
     audit({ actorType: "agent", actorId: "email", companyId: i.companyId, action: "field_request.sent", entityType: "field_request", entityId: id, summary: `Asked ${rep.name} (${rep.email}) for photo, specification and presentation` });
   } catch (e) {

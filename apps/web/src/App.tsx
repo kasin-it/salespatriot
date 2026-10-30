@@ -5,6 +5,7 @@ import { Btn, Card, Err, Field } from "./ui.tsx";
 import type { Row } from "./types.ts";
 import { Overview } from "./pages/Overview.tsx";
 import { Mission } from "./pages/Mission.tsx";
+import { Command } from "./pages/Command.tsx";
 import { Events, EventDetail } from "./pages/Events.tsx";
 import { Companies, CompanyDetail } from "./pages/Companies.tsx";
 import { Procurement } from "./pages/Procurement.tsx";
@@ -18,7 +19,7 @@ import { Integrations } from "./pages/Integrations.tsx";
 import { Settings } from "./pages/Settings.tsx";
 
 const NAV: [string, string][] = [
-  ["/", "Mission Control"], ["/events", "Events"], ["/companies", "Companies"], ["/procurement", "Procurement"],
+  ["/", "Command Center"], ["/missions", "Missions"], ["/events", "Events"], ["/companies", "Companies"], ["/procurement", "Procurement"],
   ["/negotiations", "Negotiations"], ["/deals", "Deals"], ["/overview", "Overview"], ["/matches", "Matching"], ["/agents", "Agents"],
   ["/field", "Field Agent"], ["/communication", "Communication"], ["/integrations", "Integrations"], ["/settings", "Settings"],
 ];
@@ -84,7 +85,8 @@ function Shell({ onLogout }: { onLogout: () => void }) {
       <main className="min-w-0 flex-1 overflow-y-auto p-4 md:p-6">
         <nav className="mb-4 flex gap-2 overflow-x-auto md:hidden">{NAV.map(([to, label]) => <NavLink key={to} to={to} end={to === "/"} className="whitespace-nowrap rounded border border-edge px-2 py-1 text-xs">{label}</NavLink>)}</nav>
         <Routes>
-          <Route path="/" element={<Mission />} />
+          <Route path="/" element={<Command />} />
+          <Route path="/missions" element={<Mission />} />
           <Route path="/overview" element={<Overview />} />
           <Route path="/events" element={<Events />} />
           <Route path="/events/:id" element={<EventDetail />} />

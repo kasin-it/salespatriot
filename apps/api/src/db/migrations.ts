@@ -957,4 +957,21 @@ CREATE TABLE supplier_profiles (
 `,
   },
   { id: 8, name: "mission_archive", sql: `ALTER TABLE missions ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;` },
+  {
+    id: 9,
+    name: "agent_emails",
+    sql: `
+CREATE TABLE agent_emails (
+  id INTEGER PRIMARY KEY,
+  mission_id INTEGER REFERENCES missions(id),
+  kind TEXT NOT NULL,
+  from_addr TEXT NOT NULL,
+  to_addr TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  body TEXT NOT NULL,
+  created_at ${ts}
+);
+CREATE INDEX idx_agent_emails_created ON agent_emails(created_at);
+`,
+  },
 ];

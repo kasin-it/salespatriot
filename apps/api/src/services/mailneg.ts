@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import type { OfferTerms } from "@salespatriot/shared";
 import { errorMessage, sleep } from "../lib/util.ts";
+import { logAgentEmail } from "./emaillog.ts";
 
 /** Offers between the two company agents travel as REAL emails over SMTP (Mailpit in the demo) and are read back from the mailbox. */
 export const mailboxReady = (): boolean => !!(process.env.SMTP_HOST && process.env.SMTP_FROM && process.env.MAILPIT_URL);
@@ -27,7 +28,10 @@ export function offerBody(a: { fromName: string; toName: string; kind: string; v
 export async function sendOfferEmail(a: { negId: number; version: number; kind: string; subject: string; from: "buyer" | "supplier"; fromName: string; toName: string; terms: OfferTerms; previousVersion: number | null; rationale?: string | null; mode: string }): Promise<string> {
   const t = nodemailer.createTransport({ host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT ?? 587), secure: process.env.SMTP_SECURE === "true" });
   const to = agentAddress(a.from === "buyer" ? "supplier" : "buyer");
-  const info = await t.sendMail({ from: agentAddress(a.from), to, subject: offerSubject(a.negId, a.version, a.kind, a.subject), text: offerBody({ ...a, mode: a.mode }) });
+  const subject = offerSubject(a.negId, a.version, a.kind, a.subject);
+  const text = offerBody({ ...a, mode: a.mode });
+  const info = await t.sendMail({ from: agentAddress(a.from), to, subject, text });
+  logAgentEmail({ kind: "offer", from: agentAddress(a.from), to, subject, body: text.replace(/\n*Machine-readable terms[\s\S]*$/, "") });
   return info.messageId;
 }
 
@@ -57,7 +61,9 @@ export const withBlock = (text: string, data: unknown): string => `${text}\n\n(M
 
 export async function sendAgentEmail(a: { subject: string; from: "buyer" | "supplier"; text: string }): Promise<void> {
   const t = nodemailer.createTransport({ host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT ?? 587), secure: process.env.SMTP_SECURE === "true" });
-  await t.sendMail({ from: agentAddress(a.from), to: agentAddress(a.from === "buyer" ? "supplier" : "buyer"), subject: a.subject, text: a.text });
+  const to = agentAddress(a.from === "buyer" ? "supplier" : "buyer");
+  await t.sendMail({ from: agentAddress(a.from), to, subject: a.subject, text: a.text });
+  logAgentEmail({ kind: "pre_event", from: agentAddress(a.from), to, subject: a.subject, body: a.text.replace(/\n*\(Machine-readable block[\s\S]*$/, "") });
 }
 
 /** Reads one agent email back from the mailbox by subject tag and returns its parsed data block. */

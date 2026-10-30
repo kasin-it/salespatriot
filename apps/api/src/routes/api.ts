@@ -19,6 +19,7 @@ import { runMatchingForSupplier } from "../services/matching.ts";
 import * as neg from "../services/negotiation.ts";
 import { draftEmail, parseTermsFromText, prepareCall, recordIncomingEmail, rfqEmailBody, sendApprovedEmail, smtpConfigured, twilioConfigured } from "../services/communication.ts";
 import { discoverServer, executeMcpTool, loadMcpConfig, registry, syncConfiguredServers } from "../mcp/adapter.ts";
+import { logAgentEmail } from "../services/emaillog.ts";
 import { loadProfile, saveProfile } from "../services/preevent.ts";
 import { addStep, getDemoConfig, putDemoConfig, rankEvents } from "../services/mission.ts";
 import { visionConfigured, visionModel, visionProvider } from "../services/vision.ts";
@@ -619,7 +620,9 @@ api.post("/missions/:id/rep-reply", async (c) => {
   }
   if (!attachments.length && !b.note.trim()) return c.json({ error: "Attach a photo or a spec, or write a note" }, 400);
   const t = nodemailer.createTransport({ host: process.env.SMTP_HOST, port: Number(process.env.SMTP_PORT ?? 587), secure: process.env.SMTP_SECURE === "true" });
-  await t.sendMail({ from: fr.rep_email, to: process.env.SMTP_FROM, subject: `Re: Jesteś na evencie? [${fr.token}]`, text: b.note || "Jestem przy stoisku. Zdjęcie i specyfikacja w załączniku.", attachments });
+  const replySubject = `Re: Jesteś na evencie? [${fr.token}]`; const replyText = b.note || "Jestem przy stoisku. Zdjęcie i specyfikacja w załączniku.";
+  await t.sendMail({ from: fr.rep_email, to: process.env.SMTP_FROM, subject: replySubject, text: replyText, attachments });
+  logAgentEmail({ kind: "field_reply", from: fr.rep_email, to: process.env.SMTP_FROM!, subject: replySubject, body: `${replyText}\n\nAttachments: ${attachments.map((a) => a.filename).join(", ") || "none"}` });
   enqueueTask("email", "field.poll", {}, `user:${uid(c)}`, { dedupeKey: "field-poll", priority: 1 });
   audit({ actorType: "user", actorId: uid(c), companyId: m.company_id, action: "field_request.rep_reply_sent", entityType: "field_request", entityId: m.field_request_id, summary: `Salesperson reply emailed with ${attachments.length} attachment(s)` });
   return c.json({ ok: true, attachments: attachments.length });
@@ -713,6 +716,64 @@ api.get("/missions/:id/emails/:mid", async (c) => {
   return c.json({ subject: d.Subject, from: d.From.Address, to: d.To.map((t) => t.Address).join(", "), text: d.Text, attachments: d.Attachments.map((a) => a.FileName) });
 });
 void rankEvents; void errorMessage;
+
+// ---- Command Center: one screen for the jury ----------------------------------------------------------------------
+api.get("/command-center", (c) => {
+  const mine = userCompanyIds(uid(c)).join(",") || "0";
+  const missions = db().all<Record<string, unknown>>(`
+    SELECT m.id, m.kind, m.prompt, m.status, m.created_at, m.updated_at, m.event_id, m.target_company_id, m.deal_id,
+      e.name event_name, e.start_date, e.end_date, tc.canonical_name target_name,
+      fr.stand_hint, fr.status fr_status, fr.sent_at, fr.replied_at, fr.token, p.name person_name, p.email person_email,
+      d.deal_ref, d.total_value, d.currency, d.mode deal_mode, d.negotiation_id,
+      (SELECT COUNT(*) FROM approvals a WHERE a.entity_type='negotiation' AND a.entity_id=d.negotiation_id AND a.decided_by_user_id IS NOT NULL) human_approvals,
+      (SELECT COUNT(*) FROM mission_steps ms WHERE ms.mission_id=m.id AND ms.kind='mail') pre_mails
+    FROM missions m LEFT JOIN events e ON e.id=m.event_id LEFT JOIN companies tc ON tc.id=m.target_company_id
+      LEFT JOIN field_requests fr ON fr.id=m.field_request_id LEFT JOIN field_reps p ON p.id=fr.rep_id LEFT JOIN deals d ON d.id=m.deal_id
+    WHERE m.archived=0 AND m.company_id IN (${mine}) ORDER BY m.id DESC LIMIT 40`);
+  const stage = (m: Record<string, unknown>): number =>
+    m.status === "DEAL_CLOSED" ? 4 : m.status === "NEGOTIATING" ? 3 : m.fr_status === "REPLIED" ? 2 : m.fr_status === "REQUESTED" || m.status === "WAITING_REPLY" ? 1 : m.status === "MEETING_PLANNED" ? 2 : 0;
+  const count1 = (sql: string, ...p: (string | number)[]) => db().get<{ n: number }>(sql, ...p)?.n ?? 0;
+  const closed = missions.filter((m) => m.status === "DEAL_CLOSED");
+  const feedEmails = db().all<{ id: number; kind: string; from_addr: string; to_addr: string; subject: string; created_at: string; mission_id: number | null }>(
+    `SELECT id, kind, from_addr, to_addr, subject, created_at, mission_id FROM agent_emails WHERE mission_id IS NULL OR mission_id IN (SELECT id FROM missions WHERE archived=0 AND company_id IN (${mine})) ORDER BY id DESC LIMIT 40`);
+  const feedSteps = db().all<{ id: number; kind: string; title: string; created_at: string; mission_id: number }>(
+    `SELECT s.id, s.kind, s.title, s.created_at, s.mission_id FROM mission_steps s JOIN missions m ON m.id=s.mission_id WHERE m.archived=0 AND m.company_id IN (${mine}) AND s.kind IN ('choose','plan','extract','briefing','deal','meeting','demand','candidate') ORDER BY s.id DESC LIMIT 40`);
+  const feed = [
+    ...feedEmails.map((e) => ({ type: "email", id: e.id, kind: e.kind, title: e.subject, from: e.from_addr, to: e.to_addr, at: e.created_at, missionId: e.mission_id })),
+    ...feedSteps.map((x) => ({ type: "step", id: x.id, kind: x.kind, title: x.title, at: x.created_at, missionId: x.mission_id })),
+  ].sort((a, b) => b.at.localeCompare(a.at) || b.id - a.id).slice(0, 40);
+  const ted = db().get<{ records_total: number; last_success_at: string | null }>("SELECT records_total, last_success_at FROM connector_status WHERE key='ted'");
+  const ez = db().get<{ records_total: number; last_success_at: string | null }>("SELECT records_total, last_success_at FROM connector_status WHERE key='ezamowienia'");
+  const sums: Record<string, number> = {};
+  for (const m of closed) if (m.deal_mode && m.total_value != null) { const k = `${m.deal_mode as string}:${m.currency as string}`; sums[k] = (sums[k] ?? 0) + Number(m.total_value); }
+  return c.json({
+    data: {
+      tedNotices: ted?.records_total ?? 0, tedLastSync: ted?.last_success_at ?? null, ezNotices: ez?.records_total ?? 0, ezLastSync: ez?.last_success_at ?? null,
+      openTenders: count1("SELECT COUNT(*) n FROM procurement_notices WHERE demand_class='CONFIRMED_DEMAND' AND (deadline IS NULL OR deadline > ?)", now()),
+      openTendersWithDeadline: count1("SELECT COUNT(*) n FROM procurement_notices WHERE demand_class='CONFIRMED_DEMAND' AND deadline > ?", now()),
+      events: count1("SELECT COUNT(*) n FROM events"), exhibitorsRead: count1("SELECT COUNT(*) n FROM event_exhibitors WHERE resolution_status != 'PENDING_DETAIL' AND removed_at IS NULL"),
+      suppliersWithEvidence: count1("SELECT COUNT(DISTINCT company_id) n FROM company_capabilities"), companies: count1("SELECT COUNT(*) n FROM companies"),
+    },
+    kpis: {
+      peopleSent: new Set(missions.filter((m) => m.person_email && m.status !== "FAILED").map((m) => m.person_email)).size,
+      peopleActive: new Set(missions.filter((m) => m.person_email && ["WAITING_REPLY", "NEGOTIATING", "RUNNING"].includes(String(m.status))).map((m) => m.person_email)).size,
+      agentEmails: count1("SELECT COUNT(*) n FROM agent_emails WHERE mission_id IS NULL OR mission_id IN (SELECT id FROM missions WHERE archived=0)"),
+      dealsClosed: closed.length, humanApprovals: closed.reduce((a, m) => a + Number(m.human_approvals ?? 0), 0), dealValue: sums,
+    },
+    pipeline: {
+      searching: missions.filter((m) => m.status === "RUNNING").length, waiting: missions.filter((m) => m.status === "WAITING_REPLY").length,
+      negotiating: missions.filter((m) => m.status === "NEGOTIATING").length, meeting: missions.filter((m) => m.status === "MEETING_PLANNED").length,
+      closed: closed.length, failed: missions.filter((m) => ["FAILED", "NO_AGREEMENT", "ESCALATED"].includes(String(m.status))).length,
+    },
+    missions: missions.map((m) => ({ ...m, stage: stage(m) })), feed,
+  });
+});
+api.get("/agent-emails/:id", (c) => {
+  const e = db().get<{ mission_id: number | null }>("SELECT * FROM agent_emails WHERE id=?", Number(c.req.param("id")));
+  if (!e) return c.json({ error: "Email not found" }, 404);
+  if (e.mission_id) { const m = db().get<{ company_id: number }>("SELECT company_id FROM missions WHERE id=?", e.mission_id); if (m) requireMember(uid(c), m.company_id); }
+  return c.json(e);
+});
 
 // ---- Agents & tasks -------------------------------------------------------------------------------
 api.get("/agents", (c) => c.json(db().all<{ key: string; permissions: string; tools: string }>("SELECT * FROM agents ORDER BY rowid").map((a) => ({ ...a, permissions: json(a.permissions, []), tools: json(a.tools, []),

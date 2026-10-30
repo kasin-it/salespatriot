@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { api, getToken, useApi } from "../api.ts";
 import { Badge, Btn, Card, Err, Field, Table, fmtTime } from "../ui.tsx";
 import { CandidateCard, MailBubble, MeetingCard, ProfileEditor } from "./Preevent.tsx";
@@ -235,7 +235,9 @@ export function Mission() {
   const chips3 = useApi<string[]>("/demo/suggestions-preevent");
   const profiles3 = useApi<Row[]>("/preevent/profiles", 0);
   const [supplier3, setSupplier3] = useState("");
-  const [sel, setSel] = useState<number | null>(null);
+  const [sp] = useSearchParams();
+  const [sel, setSel] = useState<number | null>(Number(sp.get("open")) || null);
+  useEffect(() => { const o = Number(sp.get("open")); if (o) setSel(o); }, [sp]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [showSetup, setShowSetup] = useState(false);
@@ -249,9 +251,8 @@ export function Mission() {
   const chip = (ok: boolean | undefined, label: string) => <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] ${ok ? "border-emerald-500/40 text-emerald-300" : "border-amber-500/40 text-amber-300"}`}><span className={`h-1.5 w-1.5 rounded-full ${ok ? "bg-emerald-400" : "bg-amber-400"}`} />{label}</span>;
   return (
     <div className="space-y-5">
-      <style>{"@keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}"}</style>
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div><h1 className="text-2xl font-bold tracking-tight">Mission Control</h1><p className="text-sm text-muted">From a sentence to a closed deal — real events, real exhibitors, negotiation by email, no human in the loop.</p></div>
+        <div><Link to="/" className="text-xs text-muted hover:text-accent">← Command Center</Link><h1 className="text-2xl font-bold tracking-tight">Missions</h1><p className="text-sm text-muted">From a sentence to a closed deal — real events, real exhibitors, negotiation by email, no human in the loop.</p></div>
         <div className="flex flex-wrap items-center gap-2">{chip(s?.status.mailpitReachable, "Mailpit")}{chip(s?.status.vision, "Photo reading")}{chip(s?.status.llm, "LLM")}{chip(s?.ready, "Setup")}<Btn onClick={() => setShowSetup(!showSetup)}>{showSetup ? "Hide setup" : "Setup"}</Btn></div>
       </div>
       {s && (!s.ready || showSetup) && <Setup setup={s} onDone={() => { setup.reload(); setShowSetup(false); }} />}
