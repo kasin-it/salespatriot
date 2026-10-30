@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api, useApi } from "../api.ts";
-import { Badge, Btn, Card, Empty, Err, Field, Table } from "../ui.tsx";
+import { Badge, Btn, Card, Empty, Err, Field, PageHead, Table } from "../ui.tsx";
 import type { Row } from "../types.ts";
 
 const POLICY_FIELDS: [string, string][] = [["currency", "Currency"], ["max_unit_price", "Max purchase price (buyer)"], ["min_unit_price", "Min sale price (supplier)"], ["max_quantity", "Max quantity"], ["min_quantity", "Min quantity"], ["allowed_payment_terms", "Allowed payment terms (comma list)"], ["max_lead_time_days", "Max lead time (days)"], ["max_rounds", "Max negotiation rounds"], ["approval_required_above_total", "Human approval above total"], ["opening_unit_price", "Opening unit price (first bid / first quote)"], ["opening_lead_time_days", "Opening lead time (days, supplier)"], ["opening_payment_terms", "Opening payment terms"], ["opening_delivery_terms", "Opening delivery terms (supplier)"], ["opening_validity_days", "Quote validity (days, supplier)"]];
@@ -18,7 +18,7 @@ export function Settings() {
   };
   return (
     <div className="space-y-5">
-      <div><h1 className="text-xl font-bold">Settings</h1></div>
+      <PageHead title="Settings" />
       <Err msg={msg} />
       <Card title="Register your company">
         <p className="mb-3 text-xs text-muted">Only the identity details you have are needed. Everything you enter is stored as USER_PROVIDED and verified against GLEIF/VIES where possible; unverified identifiers are labelled as such.</p>
@@ -29,12 +29,12 @@ export function Settings() {
         <div className="mt-3"><Btn tone="primary" disabled={!f.legalName} onClick={() => void register()}>Register &amp; start research</Btn></div>
       </Card>
       <Card title="Your companies">
-        {(me.data?.companies ?? []).length ? <Table rows={me.data!.companies} cols={[{ h: "Company", r: (c: Row) => <a className="text-sky-300" href={`/companies/${c.id}`}>{c.name}</a> }, { h: "Identity", r: (c: Row) => <Badge value={c.identity_state} /> }, { h: "Role", r: (c: Row) => c.role }, { h: "Authorisation", r: (c: Row) => c.authorization_level }]} /> : <Empty>No company registered.</Empty>}
+        {(me.data?.companies ?? []).length ? <Table rows={me.data!.companies} cols={[{ h: "Company", r: (c: Row) => <a className="text-accent underline-offset-2 hover:underline hover:text-accent" href={`/companies/${c.id}`}>{c.name}</a> }, { h: "Identity", r: (c: Row) => <Badge value={c.identity_state} /> }, { h: "Role", r: (c: Row) => c.role }, { h: "Authorisation", r: (c: Row) => c.authorization_level }]} /> : <Empty>No company registered.</Empty>}
       </Card>
       {(me.data?.companies ?? []).filter((c: Row) => c.role === "ADMIN").map((c: Row) => <PolicyEditor key={c.id} company={c} />)}
       <Card title="API token (for the Arsenal MCP server / Claude Desktop)">
         <Btn onClick={() => void api<Row>("/tokens", { body: { label: "Claude Desktop MCP", scopes: ["read", "write"] } }).then((r) => setTokenVal(r.token))}>Create token</Btn>
-        {token && <div className="mt-2 break-all rounded bg-black/40 p-2 text-xs">{token}<div className="mt-1 text-muted">Shown once. Set it as ARSENAL_API_TOKEN for the MCP server.</div></div>}
+        {token && <div className="mt-2 break-all bg-mist p-2 text-xs"><span className="font-mono">{token}</span><div className="mt-1 text-muted">Shown once. Set it as ARSENAL_API_TOKEN for the MCP server.</div></div>}
       </Card>
     </div>
   );

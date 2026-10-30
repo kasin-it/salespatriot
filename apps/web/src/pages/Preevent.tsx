@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api, useApi } from "../api.ts";
-import { Badge, Btn, Card, Err, Field } from "../ui.tsx";
+import { Badge, Btn, Cap, Card, Chip, Err, Field, Notice } from "../ui.tsx";
 import type { Row } from "../types.ts";
 
 const lines = (s: string) => s.split("\n").map((x) => x.trim()).filter(Boolean);
@@ -9,10 +9,10 @@ const stripBlock = (t: string) => t.replace(/\n*\(Machine-readable block[\s\S]*$
 export function CandidateCard({ d }: { d: Row }) {
   return (
     <div className="grid gap-3 md:grid-cols-2">
-      <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3"><div className="mb-1 text-xs font-semibold uppercase tracking-wider text-emerald-300">Known publicly (from sources)</div>
-        <ul className="space-y-0.5 text-[12px]">{(d.known as string[]).map((k) => <li key={k}>✓ {k}</li>)}</ul></div>
-      <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3"><div className="mb-1 text-xs font-semibold uppercase tracking-wider text-amber-300">Unknown / gated — to be asked</div>
-        <ul className="space-y-0.5 text-[12px]">{(d.unknown as string[]).map((k) => <li key={k}>? {k}</li>)}</ul></div>
+      <Notice><Cap>Known publicly (from sources)</Cap>
+        <ul className="space-y-0.5 text-[12px]">{(d.known as string[]).map((k) => <li key={k}>✓ {k}</li>)}</ul></Notice>
+      <Notice tone="warn"><Cap>Unknown / gated — to be asked</Cap>
+        <ul className="space-y-0.5 text-[12px]">{(d.unknown as string[]).map((k) => <li key={k}>? {k}</li>)}</ul></Notice>
       <div className="text-[11px] text-muted md:col-span-2">Event: {d.event} · {d.own ? <Badge value="YOUR OWN COMPANY" tone="green" /> : <Badge value="SIMULATED SUPPLIER AGENT" tone="amber" />}</div>
     </div>
   );
@@ -22,9 +22,9 @@ export function MailBubble({ t }: { t: Row }) {
   const buyer = t.from === "buyer";
   return (
     <div className={`flex ${buyer ? "justify-start" : "justify-end"}`}>
-      <div className={`max-w-[92%] rounded-xl border p-3 ${buyer ? "border-sky-500/30 bg-sky-500/10" : "border-violet-500/30 bg-violet-500/10"}`}>
-        <div className="mb-1 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-wider text-muted"><span className={buyer ? "text-sky-300" : "text-violet-300"}>{buyer ? "Buyer agent" : "Supplier agent"}</span><span>→ {buyer ? "supplier" : "buyer"} agent</span>{t.emailed && <Badge value="EMAILED" tone="green" />}{t.readBack && <Badge value="READ FROM MAILBOX" tone="blue" />}</div>
-        <div className="mb-1 text-[11px] font-semibold text-slate-300">{t.subject}</div>
+      <div className={`max-w-[92%] bg-mist p-3 ${buyer ? "border-l-2 border-accent" : "border-r-2 border-ink"}`}>
+        <div className="ds-cap mb-1 flex flex-wrap items-center gap-2"><span className={buyer ? "text-accent" : "text-ink"}>{buyer ? "Buyer agent" : "Supplier agent"}</span><span>→ {buyer ? "supplier" : "buyer"} agent</span>{t.emailed && <Badge value="EMAILED" tone="green" />}{t.readBack && <Badge value="READ FROM MAILBOX" tone="blue" />}</div>
+        <div className="mb-1 text-[11px] font-semibold">{t.subject}</div>
         <pre className="whitespace-pre-wrap font-sans text-[12px] leading-relaxed">{stripBlock(t.text as string)}</pre>
       </div>
     </div>
@@ -36,16 +36,16 @@ export function MeetingCard({ d, missionId, onContinue }: { d: Row; missionId: n
   const [err, setErr] = useState<string | null>(null);
   const go = async () => { setBusy(true); setErr(null); try { const r = await api<Row>(`/missions/${missionId}/continue-at-event`, { body: {} }); onContinue(r.id); } catch (e) { setErr((e as Error).message); } finally { setBusy(false); } };
   return (
-    <div className="rounded-xl border-2 border-sky-400/50 bg-gradient-to-r from-sky-500/15 to-transparent p-4">
+    <div className="border-2 border-accent p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><div className="text-lg font-bold text-sky-200">Meeting agreed</div><div className="text-sm">{d.supplier} · {d.event}</div>
-          <div className="mt-1 text-sm">🗓 {d.slot ?? "slot tbc"} · 📍 {d.stand ?? "stand tbc"}{d.attendee ? ` · 👤 ${d.attendee.name} (${d.attendee.role})` : ""}</div></div>
+        <div><div className="ds-h3 mb-1 text-accent">Meeting agreed</div><div className="text-sm">{d.supplier} · {d.event}</div>
+          <div className="mt-1 text-sm">{d.slot ?? "slot tbc"} · {d.stand ?? "stand tbc"}{d.attendee ? ` · ${d.attendee.name} (${d.attendee.role})` : ""}</div></div>
         <Btn tone="primary" disabled={busy} onClick={() => void go()}>I'm at the event → send checklist to my salesperson</Btn>
       </div>
       <div className="mt-3 grid gap-3 md:grid-cols-3 text-[12px]">
-        <div><div className="mb-1 text-[10px] uppercase tracking-wider text-muted">They will bring</div>{(d.bringing as string[]).length ? (d.bringing as string[]).map((b) => <div key={b}>• {b}</div>) : <i className="text-muted">not stated</i>}</div>
-        <div><div className="mb-1 text-[10px] uppercase tracking-wider text-emerald-300">Learned by email</div>{(d.knownNow as string[]).length ? (d.knownNow as string[]).map((b) => <div key={b}>✓ {b}</div>) : <i className="text-muted">nothing shareable</i>}</div>
-        <div><div className="mb-1 text-[10px] uppercase tracking-wider text-amber-300">Only on site (gated)</div>{(d.onSiteOnly as Row[]).map((g) => <div key={g.topic}>? {g.topic} <span className="text-muted">({g.how})</span></div>)}</div>
+        <div><Cap>They will bring</Cap>{(d.bringing as string[]).length ? (d.bringing as string[]).map((b) => <div key={b}>• {b}</div>) : <i className="text-muted">not stated</i>}</div>
+        <div><Cap>Learned by email</Cap>{(d.knownNow as string[]).length ? (d.knownNow as string[]).map((b) => <div key={b}>✓ {b}</div>) : <i className="text-muted">nothing shareable</i>}</div>
+        <div><Cap>Only on site (gated)</Cap>{(d.onSiteOnly as Row[]).map((g) => <div key={g.topic}>? {g.topic} <span className="text-muted">({g.how})</span></div>)}</div>
       </div>
       {err && <div className="mt-2"><Err msg={err} /></div>}
     </div>
@@ -80,7 +80,7 @@ export function ProfileEditor({ events, onSaved }: { events: Row[]; onSaved: () 
   return (
     <Card title="Supplier agent profile — what the supplier's agent is allowed to say">
       <p className="mb-3 text-xs text-muted">The supplier agent answers <b>only</b> from this profile; anything missing is answered “not stated”. Use <b>your own company</b> (you play both sides) or attach a profile to a <b>real exhibitor</b> — then it is a clearly labelled SIMULATION: the facts are yours, not the company's, and are never stored as company data.</p>
-      {(profiles.data ?? []).length > 0 && <div className="mb-3 flex flex-wrap gap-2 text-xs"><span className="text-muted">Saved:</span>{(profiles.data ?? []).map((p) => <button key={p.company_id} className="rounded border border-edge px-2 py-0.5 hover:border-accent hover:text-accent" onClick={() => load(p)}>{p.name} {p.is_registered ? "(own)" : "(simulated)"}</button>)}</div>}
+      {(profiles.data ?? []).length > 0 && <div className="mb-3 flex flex-wrap items-center gap-2 text-xs"><span className="text-muted">Saved:</span>{(profiles.data ?? []).map((p) => <Chip key={p.company_id} onClick={() => load(p)}>{p.name} {p.is_registered ? "(own)" : "(simulated)"}</Chip>)}</div>}
       <div className="grid gap-3 md:grid-cols-4">
         <Field label="Event they attend"><select value={eventId} onChange={(e) => setEventId(e.target.value)}><option value="">Select…</option>{events.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}</select></Field>
         <Field label="Supplier is…"><select value={mode} onChange={(e) => { setMode(e.target.value as "exhibitor" | "own"); setCompanyId(""); }}><option value="exhibitor">A real exhibitor (simulated agent)</option><option value="own">My own company (I play both sides)</option></select></Field>

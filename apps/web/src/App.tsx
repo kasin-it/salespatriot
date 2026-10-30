@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, Navigate, Route, Routes } from "react-router";
 import { api, getToken, setToken, useApi } from "./api.ts";
-import { Btn, Card, Err, Field } from "./ui.tsx";
+import { Btn, Card, Err, Field, Logo } from "./ui.tsx";
 import type { Row } from "./types.ts";
 import { Overview } from "./pages/Overview.tsx";
 import { Mission } from "./pages/Mission.tsx";
@@ -35,16 +35,16 @@ function Login({ onDone }: { onDone: () => void }) {
     } catch (e) { setErr((e as Error).message); }
   };
   return (
-    <div className="grid h-full place-items-center p-4">
+    <div className="grid h-full place-items-center bg-mist p-4">
       <div className="w-full max-w-sm space-y-4">
-        <div className="text-center"><div className="text-2xl font-bold tracking-wide text-accent">ARSENAL AI</div><div className="text-xs text-muted">European defence &amp; industrial event intelligence</div></div>
+        <div className="flex flex-col items-center gap-2 text-center"><span className="ds-brand"><Logo />Arsenal AI</span><div className="ds-cap">European defence &amp; industrial event intelligence</div></div>
         <Card title={mode === "login" ? "Sign in" : "Create account"}>
           <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
             {mode === "register" && <Field label="Name"><input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>}
             <Field label="Work email"><input type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></Field>
             <Field label="Password (min. 10 characters)"><input type="password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} /></Field>
             <Err msg={err} />
-            <div className="flex items-center justify-between"><Btn type="submit" tone="primary">{mode === "login" ? "Sign in" : "Register"}</Btn>
+            <div className="flex items-center justify-between"><Btn type="submit" tone="primary" size="lg">{mode === "login" ? "Sign in" : "Register"}</Btn>
               <button type="button" className="text-xs text-muted underline" onClick={() => setMode(mode === "login" ? "register" : "login")}>{mode === "login" ? "Need an account?" : "Have an account?"}</button></div>
           </form>
         </Card>
@@ -66,23 +66,23 @@ function Shell({ onLogout }: { onLogout: () => void }) {
   const pending = (approvals.data ?? []).filter((a) => a.status === "PENDING").length;
   return (
     <div className="flex h-full">
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-edge bg-panel md:flex">
-        <div className="px-4 py-4"><div className="text-lg font-bold tracking-wide text-accent">ARSENAL AI</div><div className="text-[11px] text-muted">Events → Opportunities → Deals</div></div>
+      <aside className="hidden w-60 shrink-0 flex-col border-r border-edge bg-paper md:flex">
+        <div className="space-y-2 px-4 py-4"><span className="ds-brand"><Logo />Arsenal AI</span><div className="ds-cap">Events → Opportunities → Deals</div></div>
         <nav className="flex-1 space-y-0.5 px-2">
           {NAV.map(([to, label]) => (
-            <NavLink key={to} to={to} end={to === "/"} className={({ isActive }) => `flex items-center justify-between rounded-md px-3 py-2 text-[13px] ${isActive ? "bg-accent/15 text-accent" : "text-slate-300 hover:bg-white/5"}`}>
-              {label}{to === "/negotiations" && pending > 0 && <span className="rounded bg-amber-500 px-1.5 text-[10px] font-bold text-black">{pending}</span>}
+            <NavLink key={to} to={to} end={to === "/"} className={({ isActive }) => `flex items-center justify-between px-3 py-2 font-mono text-[13px] font-medium no-underline ${isActive ? "bg-fill text-ink" : "text-muted hover:bg-fill hover:text-ink"}`}>
+              {label}{to === "/negotiations" && pending > 0 && <span className="ds-tag">{pending}</span>}
             </NavLink>
           ))}
         </nav>
         <div className="border-t border-edge p-3 text-xs text-muted">
-          <div className="truncate text-slate-300">{me.data?.user?.email}</div>
+          <div className="truncate text-ink">{me.data?.user?.email}</div>
           <div className="mb-2">{(me.data?.companies ?? []).length ? `${me.data!.companies.length} compan${me.data!.companies.length > 1 ? "ies" : "y"}` : "No company registered"}</div>
           <Btn onClick={onLogout}>Sign out</Btn>
         </div>
       </aside>
-      <main className="min-w-0 flex-1 overflow-y-auto p-4 md:p-6">
-        <nav className="mb-4 flex gap-2 overflow-x-auto md:hidden">{NAV.map(([to, label]) => <NavLink key={to} to={to} end={to === "/"} className="whitespace-nowrap rounded border border-edge px-2 py-1 text-xs">{label}</NavLink>)}</nav>
+      <main className="min-w-0 flex-1 overflow-y-auto bg-mist p-4 md:p-8">
+        <nav className="mb-4 flex gap-2 overflow-x-auto md:hidden">{NAV.map(([to, label]) => <NavLink key={to} to={to} end={to === "/"} className={({ isActive }) => `ds-tag whitespace-nowrap no-underline ${isActive ? "ds-tag--dark" : "ds-tag--outline"}`}>{label}</NavLink>)}</nav>
         <Routes>
           <Route path="/" element={<Mission />} />
           <Route path="/overview" element={<Overview />} />

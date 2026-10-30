@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { api, useApi } from "../api.ts";
-import { Badge, Btn, Card, Empty, Err, ExtLink, Field, Table, Unknown, fmtDate, fmtTime } from "../ui.tsx";
+import { Badge, Btn, Card, Empty, Err, ExtLink, Field, PageHead, Table, Unknown, fmtDate, fmtTime } from "../ui.tsx";
 import type { Row } from "../types.ts";
 
 export function Companies() {
@@ -13,7 +13,7 @@ export function Companies() {
   const nav = useNavigate();
   return (
     <div className="space-y-5">
-      <div><h1 className="text-xl font-bold">Company Intelligence</h1><p className="text-sm text-muted">Canonical company records. One company, many events; identity state is shown on every record.</p></div>
+      <PageHead title="Company Intelligence" sub="Canonical company records. One company, many events; identity state is shown on every record." />
       <Card title="Filters"><div className="grid gap-3 md:grid-cols-3">
         <Field label="Name or website"><input value={q} onChange={(e) => setQ(e.target.value)} /></Field>
         <Field label="Identity state"><select value={state} onChange={(e) => setState(e.target.value)}><option value="">Any</option>{["UNVERIFIED", "IDENTIFIED", "VERIFIED", "NEEDS_REVIEW", "INACTIVE"].map((s) => <option key={s}>{s}</option>)}</select></Field>
@@ -44,19 +44,18 @@ export function CompanyDetail() {
   const running = (data.tasks as Row[]).some((t) => ["QUEUED", "RUNNING", "RETRY_SCHEDULED"].includes(t.status));
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><Link to="/companies" className="text-xs text-muted">← Companies</Link>
-          <h1 className="text-xl font-bold">{c.canonical_name} <Badge value={c.identity_state} /></h1>
-          <div className="text-sm text-muted">{c.legal_name && c.legal_name !== c.canonical_name ? `Legal name: ${c.legal_name} · ` : ""}{c.country ?? "Country unknown"} · <ExtLink href={c.website} /></div></div>
-        <div className="flex gap-2"><Btn onClick={() => void act(`/companies/${id}/verify`)} disabled={running}>Verify identity (GLEIF/VIES)</Btn><Btn onClick={() => void act(`/companies/${id}/enrich`)} disabled={running}>Enrich from website</Btn></div>
+      <div className="space-y-2"><Link to="/companies" className="ds-cap inline-block hover:text-accent">← Companies</Link>
+        <PageHead title={<span className="inline-flex flex-wrap items-center gap-3">{c.canonical_name} <Badge value={c.identity_state} /></span>}
+          sub={<>{c.legal_name && c.legal_name !== c.canonical_name ? `Legal name: ${c.legal_name} · ` : ""}{c.country ?? "Country unknown"} · <ExtLink href={c.website} /></>}
+          actions={<><Btn onClick={() => void act(`/companies/${id}/verify`)} disabled={running}>Verify identity (GLEIF/VIES)</Btn><Btn onClick={() => void act(`/companies/${id}/enrich`)} disabled={running}>Enrich from website</Btn></>} />
       </div>
       {msg && <div className="text-xs text-muted">{msg}</div>}
-      {(data.tasks as Row[]).length > 0 && <div className="flex flex-wrap gap-3 text-xs">{(data.tasks as Row[]).slice(0, 4).map((t) => <span key={t.id}>{t.type} <Badge value={t.status} />{t.error ? <span className="text-red-300"> {String(t.error).slice(0, 60)}</span> : null}</span>)}</div>}
+      {(data.tasks as Row[]).length > 0 && <div className="flex flex-wrap gap-3 text-xs">{(data.tasks as Row[]).slice(0, 4).map((t) => <span key={t.id}>{t.type} <Badge value={t.status} />{t.error ? <span className="text-alert"> {String(t.error).slice(0, 60)}</span> : null}</span>)}</div>}
       {(data.conflicts as Row[]).length > 0 && <Card title="Data conflicts (multiple sources disagree — all preserved)"><ul className="text-[13px]">{(data.conflicts as Row[]).map((k) => <li key={k.field}><b>{k.field}</b>: {(k.values as string[]).join("  ≠  ")}</li>)}</ul></Card>}
       <div className="grid gap-5 lg:grid-cols-2">
-        <Card title="Identifiers"><Table rows={data.identifiers} empty="No identifiers known. Identity is based on name/website only." cols={[{ h: "Scheme", r: (i) => i.scheme }, { h: "Value", r: (i) => i.value }, { h: "Status", r: (i) => <Badge value={i.verified ? "VERIFIED" : "UNVERIFIED"} /> }, { h: "Source", r: (i) => <ExtLink href={i.source_url}>source</ExtLink> }]} />
+        <Card title="Identifiers"><Table rows={data.identifiers} empty="No identifiers known. Identity is based on name/website only." cols={[{ h: "Scheme", r: (i) => i.scheme }, { h: "Value", r: (i) => <span className="font-mono">{i.value}</span> }, { h: "Status", r: (i) => <Badge value={i.verified ? "VERIFIED" : "UNVERIFIED"} /> }, { h: "Source", r: (i) => <ExtLink href={i.source_url}>source</ExtLink> }]} />
           {(data.aliases as Row[]).length > 0 && <div className="mt-2 text-[12px] text-muted">Known aliases: {(data.aliases as Row[]).map((a) => a.alias).join("; ")}</div>}</Card>
-        <Card title="Events attended"><Table rows={data.events} empty="Not linked to any event." cols={[{ h: "Event", r: (e) => <Link className="text-sky-300" to={`/events/${e.id}`}>{e.name}</Link> }, { h: "Dates", r: (e) => fmtDate(e.start_date) ?? <Unknown /> }, { h: "Stand", r: (e) => e.booth ?? <Unknown /> }, { h: "Evidence", r: (e) => <ExtLink href={e.profile_url ?? e.source_url}>profile</ExtLink> }]} /></Card>
+        <Card title="Events attended"><Table rows={data.events} empty="Not linked to any event." cols={[{ h: "Event", r: (e) => <Link className="text-accent underline-offset-2 hover:underline hover:text-accent" to={`/events/${e.id}`}>{e.name}</Link> }, { h: "Dates", r: (e) => fmtDate(e.start_date) ?? <Unknown /> }, { h: "Stand", r: (e) => e.booth ?? <Unknown /> }, { h: "Evidence", r: (e) => <ExtLink href={e.profile_url ?? e.source_url}>profile</ExtLink> }]} /></Card>
       </div>
       <Card title="Capabilities (classification shown; evidence quoted from the source)">
         <Table rows={data.capabilities} empty="No capability evidence found. Unknown — requires company confirmation." cols={[
