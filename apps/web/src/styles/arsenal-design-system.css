@@ -1,0 +1,338 @@
+/* =====================================================================
+   ARSENAL AI — DESIGN SYSTEM  (v0.1, single file)
+   ---------------------------------------------------------------------
+   Look:  precise, engineered, quiet. Ink on paper, one blue signal,
+          monospaced technical labels, 45° chamfered corners, hairlines,
+          schematic diagrams with grey traces and blue "lasers".
+
+   Drop-in:  <link rel="stylesheet" href="arsenal-design-system.css">
+   Fonts: Geist + Geist Mono are linked from apps/web/index.html.
+
+   Quick reference
+     Eyebrow label   <p class="ds-label"><span class="ds-dot"></span>Data flow</p>
+     Headings        <h1 class="ds-display">…</h1>  <h2 class="ds-h2">…</h2>
+     Buttons         <a class="ds-btn">Request a demo</a>
+                     <a class="ds-btn ds-btn--dark">…</a>
+                     <a class="ds-btn ds-btn--ghost">…</a>
+     Tags            <span class="ds-tag">Impact study</span>  (--muted, --outline)
+     Cards           <div class="ds-card">…</div>  (--dark, --accent)
+     Schematic       <div class="ds-group"> <div class="ds-group__head"><b>DATA</b> / PUBLIC SOURCES</div> …tiles… </div>
+                     <div class="ds-tile"><svg class="ds-icon">…</svg><span>TENDERS</span></div>
+                     <div class="ds-core">…logo…</div>  <span class="ds-port"></span>
+     Traces/lasers   see section 9 (SVG)
+     Status banner   <div class="ds-banner">DEAL CLOSED · human approvals: 0</div>
+   ===================================================================== */
+
+
+/* ---------------------------------------------------------------------
+   1. TOKENS
+   --------------------------------------------------------------------- */
+:root {
+  /* Color — ground */
+  --ds-paper:      #FFFFFF;   /* page, cards, tiles */
+  --ds-mist:       #F6F6F6;   /* section ground, diagram ground */
+  --ds-mist-2:     #F0F0F0;   /* inset panels (agent layer) */
+
+  /* Color — ink */
+  --ds-ink:        #12171A;   /* text, dark surfaces */
+  --ds-ink-70:     #5F6366;   /* secondary text (passes 4.5:1 on paper & mist) */
+  --ds-ink-50:     #8A9196;   /* icons, captions on dark */
+  --ds-ink-30:     rgba(18, 23, 26, 0.30);  /* disabled, decor */
+  --ds-line:       rgba(18, 23, 26, 0.10);  /* hairlines */
+  --ds-fill:       rgba(18, 23, 26, 0.08);  /* chips, hovers */
+  --ds-steel:      #D9D9D9;   /* diagram strokes */
+  --ds-trace:      #C9CCCE;   /* schematic traces (always grey) */
+
+  /* Color — on dark */
+  --ds-on-dark:        #F6F6F6;
+  --ds-on-dark-muted:  #B9BEC2;
+  --ds-on-dark-line:   #2E363B;
+
+  /* Color — signal */
+  --ds-accent:       #1957EA;  /* the one accent: CTAs, links, lasers, core */
+  --ds-accent-soft:  #8FB0FF;  /* accent text on ink */
+  --ds-alert:        #AC0000;  /* errors only */
+
+  /* Type */
+  --ds-font:  "Geist", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --ds-mono:  "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --ds-track: -0.02em;        /* tight tracking everywhere */
+
+  --ds-fs-display: clamp(44px, 7vw, 88px);   /* lh 1.0, -4% */
+  --ds-fs-h1:      clamp(36px, 4.5vw, 48px); /* lh 1.1, 700 */
+  --ds-fs-h2:      clamp(30px, 3.5vw, 40px); /* lh 1.0, 400 */
+  --ds-fs-h3:      24px;
+  --ds-fs-lead:    20px;                     /* lh 1.48 */
+  --ds-fs-body:    16px;                     /* lh 1.5 */
+  --ds-fs-label:   13px;                     /* mono */
+  --ds-fs-micro:   11px;                     /* mono caps */
+
+  /* Space — 8pt grid */
+  --ds-s1: 8px;  --ds-s2: 16px; --ds-s3: 24px; --ds-s4: 32px;
+  --ds-s6: 48px; --ds-s12: 96px; --ds-s15: 120px;
+
+  /* Shape — no radius, chamfers instead */
+  --ds-radius: 0px;
+  --ds-chamfer-btn:  10px;
+  --ds-chamfer-sm:   18px;
+  --ds-chamfer-md:   24px;
+  --ds-chamfer-lg:   32px;
+
+  /* Motion */
+  --ds-ease: cubic-bezier(.45, 0, .55, 1);
+}
+
+/* ---------------------------------------------------------------------
+   2. BASE
+   --------------------------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--ds-paper);
+  color: var(--ds-ink);
+  font-family: var(--ds-font);
+  font-size: var(--ds-fs-body);
+  line-height: 1.5;
+  letter-spacing: var(--ds-track);
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--ds-ink); }
+a:hover { color: var(--ds-ink-70); }
+:focus-visible { outline: 2px solid var(--ds-accent); outline-offset: 2px; }
+hr { border: 0; border-top: 1px solid var(--ds-line); margin: 0; }
+.ds-mono { font-family: var(--ds-mono); font-weight: 500; }
+
+/* ---------------------------------------------------------------------
+   3. TYPOGRAPHY
+   --------------------------------------------------------------------- */
+.ds-display { margin: 0; font-size: var(--ds-fs-display); line-height: 1; font-weight: 400; letter-spacing: -0.04em; }
+.ds-h1      { margin: 0; font-size: var(--ds-fs-h1); line-height: 1.1; font-weight: 700; }
+.ds-h2      { margin: 0; font-size: var(--ds-fs-h2); line-height: 1; font-weight: 400; }
+.ds-h3      { margin: 0; font-size: var(--ds-fs-h3); line-height: 1.1; font-weight: 400; }
+.ds-lead    { margin: 0; font-size: var(--ds-fs-lead); line-height: 1.48; color: var(--ds-ink-70); }
+.ds-muted   { color: var(--ds-ink-70); }
+
+/* Eyebrow: "• Section label" in mono */
+.ds-label {
+  margin: 0; display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--ds-mono); font-size: var(--ds-fs-label); font-weight: 500;
+  color: var(--ds-ink-70);
+}
+.ds-label--accent { color: var(--ds-accent); text-transform: uppercase; letter-spacing: .04em; font-weight: 600; }
+.ds-dot { width: 6px; height: 6px; background: var(--ds-ink); display: inline-block; }
+.ds-cap {
+  font-family: var(--ds-mono); font-size: var(--ds-fs-micro); font-weight: 500;
+  text-transform: uppercase; letter-spacing: .02em; color: var(--ds-ink-70);
+}
+
+/* ---------------------------------------------------------------------
+   4. LAYOUT
+   --------------------------------------------------------------------- */
+.ds-wrap    { max-width: 1280px; margin: 0 auto; padding-inline: clamp(16px, 4vw, 80px); }
+.ds-section { padding-block: var(--ds-s12); border-top: 1px solid var(--ds-line); }
+.ds-section--mist { background: var(--ds-mist); }
+.ds-section--ink  { background: var(--ds-ink); color: var(--ds-on-dark); }
+.ds-stack   { display: flex; flex-direction: column; gap: var(--ds-s3); }
+.ds-grid    { display: grid; gap: var(--ds-s3); grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.ds-ruled   { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); border: 1px solid var(--ds-line); background: var(--ds-paper); }
+.ds-ruled > * { padding: var(--ds-s3); border-right: 1px solid var(--ds-line); }
+.ds-ruled > *:last-child { border-right: 0; }
+
+/* ---------------------------------------------------------------------
+   5. CHAMFER UTILITIES (45° cut, top-right; --both also bottom-left)
+   --------------------------------------------------------------------- */
+.ds-chamfer      { --c: var(--ds-chamfer-md); clip-path: polygon(0 0, calc(100% - var(--c)) 0, 100% var(--c), 100% 100%, 0 100%); }
+.ds-chamfer-both { --c: var(--ds-chamfer-md); clip-path: polygon(0 0, calc(100% - var(--c)) 0, 100% var(--c), 100% 100%, var(--c) 100%, 0 calc(100% - var(--c))); }
+.ds-chamfer--sm { --c: var(--ds-chamfer-sm); }
+.ds-chamfer--lg { --c: var(--ds-chamfer-lg); }
+
+/* ---------------------------------------------------------------------
+   6. BUTTONS, TAGS, INPUTS
+   --------------------------------------------------------------------- */
+.ds-btn {
+  --c: var(--ds-chamfer-btn);
+  display: inline-flex; align-items: center; gap: 10px;
+  min-height: 44px; padding: 0 20px; border: 0; cursor: pointer;
+  font: 500 14px/1 var(--ds-font); letter-spacing: var(--ds-track);
+  text-decoration: none; color: #FFFFFF; background: var(--ds-accent);
+  clip-path: polygon(0 0, calc(100% - var(--c)) 0, 100% var(--c), 100% 100%, 0 100%);
+  transition: filter .15s;
+}
+.ds-btn:hover { color: #FFFFFF; filter: brightness(1.08); }
+.ds-btn--dark  { background: var(--ds-ink); }
+.ds-btn--light { background: var(--ds-paper); color: var(--ds-ink); }
+.ds-btn--light:hover { color: var(--ds-ink); }
+.ds-btn--soft  { background: var(--ds-mist); color: var(--ds-ink); clip-path: none; }
+.ds-btn--soft:hover { color: var(--ds-ink); filter: brightness(.97); }
+.ds-btn--ghost { background: transparent; color: var(--ds-ink); box-shadow: inset 0 0 0 1px var(--ds-ink); clip-path: none; }
+.ds-btn--ghost:hover { color: var(--ds-ink); background: var(--ds-fill); }
+.ds-btn[disabled] { opacity: .4; cursor: not-allowed; }
+
+.ds-tag {
+  display: inline-block; padding: 4px 8px;
+  font: 500 var(--ds-fs-micro)/1.3 var(--ds-mono); text-transform: uppercase; letter-spacing: .02em;
+  background: var(--ds-accent); color: #FFFFFF;
+}
+.ds-tag--muted   { background: var(--ds-fill); color: var(--ds-ink); }
+.ds-tag--outline { background: transparent; color: var(--ds-ink); box-shadow: inset 0 0 0 1px var(--ds-ink-30); }
+.ds-tag--dark    { background: var(--ds-ink); color: var(--ds-on-dark); }
+
+.ds-field { display: flex; flex-direction: column; gap: 8px; }
+.ds-field > label { font: 500 var(--ds-fs-micro)/1 var(--ds-mono); text-transform: uppercase; color: var(--ds-ink-70); }
+.ds-input {
+  height: 44px; padding: 0 16px; width: 100%;
+  font: 400 14px var(--ds-font); color: var(--ds-ink); background: var(--ds-paper);
+  border: 1px solid var(--ds-ink-30); border-radius: 0; outline: none;
+}
+.ds-input:focus { border-color: var(--ds-accent); }
+.ds-inputgroup { display: flex; }
+.ds-inputgroup .ds-input { border-right: 0; }
+.ds-inputgroup .ds-btn { clip-path: none; }
+
+/* Filter tabs: big text, active = ink, rest = muted */
+.ds-tabs { display: flex; flex-wrap: wrap; gap: 24px; font-size: 24px; }
+.ds-tabs > * { color: var(--ds-ink-70); text-decoration: none; background: none; border: 0; padding: 0; font: inherit; cursor: pointer; }
+.ds-tabs > [aria-selected="true"], .ds-tabs > .is-active { color: var(--ds-ink); }
+
+/* ---------------------------------------------------------------------
+   7. CARDS
+   --------------------------------------------------------------------- */
+.ds-card {
+  --c: var(--ds-chamfer-lg);
+  display: flex; flex-direction: column; justify-content: space-between; gap: var(--ds-s3);
+  padding: var(--ds-s4); min-height: 240px; background: var(--ds-paper);
+  clip-path: polygon(0 0, calc(100% - var(--c)) 0, 100% var(--c), 100% 100%, 0 100%);
+}
+.ds-card--outline { box-shadow: inset 0 0 0 1px var(--ds-line); clip-path: none; }
+.ds-card--dark    { background: var(--ds-ink); color: var(--ds-on-dark); }
+.ds-card--dark .ds-muted, .ds-card--dark .ds-label { color: var(--ds-on-dark-muted); }
+.ds-card--accent  { background: var(--ds-accent); color: #FFFFFF; }   /* max one per view */
+.ds-card--accent .ds-muted, .ds-card--accent .ds-label { color: #FFFFFF; }
+
+/* Big stat */
+.ds-stat { display: flex; flex-direction: column; gap: 4px; }
+.ds-stat__value { font: 500 40px/1 var(--ds-mono); letter-spacing: -0.03em; }
+.ds-stat__label { font: 500 var(--ds-fs-micro)/1.3 var(--ds-mono); text-transform: uppercase; color: var(--ds-ink-70); }
+
+/* Status banner (e.g. DEAL CLOSED) */
+.ds-banner {
+  --c: var(--ds-chamfer-md);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 16px 32px;
+  padding: 20px 28px; background: var(--ds-ink); color: var(--ds-on-dark);
+  font: 600 18px/1.3 var(--ds-mono); text-transform: uppercase; letter-spacing: .02em;
+  clip-path: polygon(0 0, calc(100% - var(--c)) 0, 100% var(--c), 100% 100%, 0 100%);
+}
+.ds-banner::before { content: ""; width: 12px; height: 12px; background: var(--ds-accent); flex: none; }
+.ds-banner--accent { background: var(--ds-accent); color: #FFFFFF; }
+.ds-banner--accent::before { background: #FFFFFF; }
+
+/* ---------------------------------------------------------------------
+   8. SCHEMATIC DIAGRAM PRIMITIVES
+   --------------------------------------------------------------------- */
+.ds-diagram { background: var(--ds-mist); padding: var(--ds-s6); position: relative; }
+
+/* Layer container: dashed (data/outcome) or solid inset (agent layer) */
+.ds-group {
+  --c: 30px;
+  position: relative; padding: 0 var(--ds-s4) var(--ds-s4);
+  background:
+    linear-gradient(var(--ds-mist), var(--ds-mist)) padding-box;
+  outline: 2px dashed var(--ds-trace); outline-offset: -2px;
+}
+.ds-group--solid { background: var(--ds-mist-2); outline: 2px solid #D3D6D8; }
+.ds-group__head {
+  margin: 0 calc(-1 * var(--ds-s4)) var(--ds-s4); padding: 22px var(--ds-s4);
+  border-bottom: 2px dashed var(--ds-trace); text-align: center;
+  font: 500 16px/1 var(--ds-mono); letter-spacing: .03em; text-transform: uppercase; color: var(--ds-ink-50);
+}
+.ds-group--solid .ds-group__head { border-bottom-style: solid; border-color: #D3D6D8; }
+.ds-group__head b { color: var(--ds-ink); font-weight: 500; }
+
+/* Tile: white, chamfered, icon + mono caps label */
+.ds-tile {
+  --c: var(--ds-chamfer-md);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+  min-height: 160px; padding: 20px; background: var(--ds-paper); text-align: center;
+  font: 500 15px/1.25 var(--ds-mono); text-transform: uppercase; letter-spacing: .03em; color: #3B4146;
+  clip-path: polygon(0 0, calc(100% - var(--c)) 0, 100% var(--c), 100% 100%, var(--c) 100%, 0 calc(100% - var(--c)));
+}
+.ds-tile--compact { min-height: 0; align-items: flex-start; text-align: left; padding: 16px 18px; --c: var(--ds-chamfer-sm); }
+/* Highlighted tile (e.g. SIGNED DEAL): blue outline. clip-path hides borders, so we use a drop-shadow outline. */
+.ds-tile--accent { filter: drop-shadow(0 0 0 var(--ds-accent)); box-shadow: inset 0 0 0 2px var(--ds-accent); }
+
+/* Line icon inside tiles: 48px, 2.5 stroke, muted */
+.ds-icon { width: 48px; height: 48px; fill: none; stroke: var(--ds-ink-50); stroke-width: 2.5; stroke-linejoin: miter; }
+
+/* Core: the Arsenal AI node — blue outline, double chamfer, framed */
+.ds-core-frame { padding: 28px; background: #F7F7F7; box-shadow: inset 0 0 0 2px #DADCDD; }
+.ds-core {
+  --c: 30px;
+  display: grid; place-items: center; aspect-ratio: 1; min-width: 160px; background: var(--ds-paper);
+  box-shadow: inset 0 0 0 2.5px var(--ds-accent);
+  clip-path: polygon(0 0, calc(100% - var(--c)) 0, 100% var(--c), 100% 100%, var(--c) 100%, 0 calc(100% - var(--c)));
+}
+.ds-core__label {
+  display: inline-block; margin-top: 12px; padding: 8px 16px;
+  font: 500 16px/1 var(--ds-mono); letter-spacing: .04em; text-transform: uppercase;
+  background: var(--ds-mist); box-shadow: inset 0 0 0 1px #DADCDD;
+}
+
+/* Port: small square where a trace meets a node */
+.ds-port { display: inline-block; width: 14px; height: 14px; background: var(--ds-paper); box-shadow: inset 0 0 0 2px #A9AEB2; }
+
+/* ---------------------------------------------------------------------
+   9. TRACES & LASERS (SVG)
+   Rule: every trace is GREY. Only the moving laser is BLUE.
+
+   <svg viewBox="0 0 1200 600">
+     <defs>
+       <!-- one gradient per route, from start point to end point -->
+       <linearGradient id="l1" gradientUnits="userSpaceOnUse" x1="100" y1="300" x2="600" y2="300">
+         <stop offset="0" stop-color="#1957EA" stop-opacity=".15"/>
+         <stop offset="1" stop-color="#1957EA"/>
+       </linearGradient>
+     </defs>
+     <path class="ds-trace" d="M100 300H600"/>
+     <path class="ds-laser" d="M100 300H600" pathLength="1000" stroke="url(#l1)" style="--dur:2.4s;--delay:.6s"/>
+   </svg>
+   --------------------------------------------------------------------- */
+.ds-trace        { fill: none; stroke: var(--ds-trace); stroke-width: 2; }
+.ds-trace--dash  { stroke-dasharray: 10 8; animation: ds-march .7s linear infinite; }
+.ds-laser {
+  fill: none; stroke: var(--ds-accent); stroke-width: 5; stroke-linecap: round;
+  stroke-dasharray: 320 1000; stroke-dashoffset: 320;      /* needs pathLength="1000" */
+  animation: ds-laser var(--dur, 2.4s) var(--ds-ease) var(--delay, 0s) infinite;
+}
+@keyframes ds-laser { from { stroke-dashoffset: 320; } to { stroke-dashoffset: -1000; } }
+@keyframes ds-march { to { stroke-dashoffset: -18; } }
+
+/* Reveal: stagger tiles in with style="--i:0..n" */
+.ds-reveal { opacity: 0; animation: ds-rise .6s var(--ds-ease) calc(var(--i, 0) * .12s) forwards; }
+@keyframes ds-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+/* ---------------------------------------------------------------------
+   10. HEADER, FOOTER, WORDMARK
+   --------------------------------------------------------------------- */
+.ds-nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding-block: 16px; border-bottom: 1px solid var(--ds-line); }
+.ds-nav__links { display: flex; flex-wrap: wrap; gap: 28px; font-size: 14px; font-weight: 500; }
+.ds-nav__links a { text-decoration: none; }
+.ds-brand { display: inline-flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 600; letter-spacing: -0.03em; text-decoration: none; }
+/* Logo mark (inline SVG, 32×32):
+   <svg width="28" height="28" viewBox="0 0 32 32" aria-hidden="true">
+     <path d="M8 0H32V24L24 32H0V8Z" fill="#12171A"/>
+     <path d="M9 23L16 9L23 23" stroke="#fff" stroke-width="2.5" fill="none"/>
+     <path d="M12.5 18H19.5" stroke="#1957EA" stroke-width="2.5"/>
+   </svg> */
+.ds-wordmark {
+  display: block; overflow: hidden; white-space: nowrap;
+  font-size: clamp(64px, 16vw, 236px); line-height: .85; font-weight: 700;
+  letter-spacing: -0.05em; text-transform: uppercase; color: var(--ds-mist);
+}
+
+/* ---------------------------------------------------------------------
+   11. ACCESSIBILITY & MOTION
+   --------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .ds-laser, .ds-trace--dash, .ds-reveal { animation: none; opacity: 1; }
+}

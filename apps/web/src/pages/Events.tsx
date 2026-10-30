@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { api, useApi } from "../api.ts";
-import { Badge, Btn, Card, Empty, Err, ExtLink, Stat, Table, Unknown, fmtDate, fmtTime } from "../ui.tsx";
+import { Badge, Btn, Card, Empty, Err, ExtLink, PageHead, Stat, Table, Unknown, fmtDate, fmtTime } from "../ui.tsx";
 import type { Row } from "../types.ts";
 
 export function Events() {
@@ -16,12 +16,9 @@ export function Events() {
   for (const e of data ?? []) groups[{ UPCOMING: 0, ONGOING: 1, HISTORICAL: 2, UNKNOWN_DATES: 3 }[e.phase as string] ?? 3]![1].push(e);
   return (
     <div className="space-y-5">
-      <div className="flex items-end justify-between gap-3">
-        <div><h1 className="text-xl font-bold">Event Intelligence</h1><p className="text-sm text-muted">Official events, their exhibitors and monitoring status. Dates and exhibitors come only from official sources.</p></div>
-        <Btn onClick={() => void api("/events/discover", { body: {} }).then(() => setMsg("Discovery task queued — see Agent Manager."))}>Run Event Discovery</Btn>
-      </div>
+      <PageHead title="Event Intelligence" sub="Official events, their exhibitors and monitoring status. Dates and exhibitors come only from official sources." actions={<Btn size="lg" onClick={() => void api("/events/discover", { body: {} }).then(() => setMsg("Discovery task queued — see Agent Manager."))}>Run Event Discovery</Btn>} />
       <Card title="Add an event by official URL">
-        <div className="flex gap-2"><input placeholder="https://www.example-event.com/" value={url} onChange={(e) => setUrl(e.target.value)} /><Btn tone="primary" onClick={() => void add()} disabled={!url}>Add &amp; research</Btn></div>
+        <div className="flex gap-2"><input className="min-w-0 flex-1" placeholder="https://www.example-event.com/" value={url} onChange={(e) => setUrl(e.target.value)} /><Btn tone="primary" onClick={() => void add()} disabled={!url}>Add &amp; research</Btn></div>
         {msg && <div className="mt-2 text-xs text-muted">{msg}</div>}
       </Card>
       <Err msg={error} />
@@ -56,9 +53,8 @@ export function EventDetail() {
   const act = async (path: string, body: unknown = {}) => { try { const r = await api<Row>(path, { body }); setMsg(r.note ?? "Done"); reload(); } catch (err) { setMsg((err as Error).message); } };
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><Link to="/events" className="text-xs text-muted">← Events</Link><h1 className="text-xl font-bold">{e.name}</h1><ExtLink href={e.official_url} /></div>
-        <div className="flex gap-2"><Btn tone="primary" disabled={running} onClick={() => void act(`/events/${id}/research`)}>{running ? "Research in progress…" : "RESEARCH EVENT"}</Btn><Btn onClick={() => void act(`/events/${id}/check-now`)}>Check for changes now</Btn></div>
+      <div className="space-y-2"><Link to="/events" className="ds-cap inline-block hover:text-accent">← Events</Link>
+        <PageHead title={e.name} sub={<ExtLink href={e.official_url} />} actions={<><Btn size="lg" tone="primary" disabled={running} onClick={() => void act(`/events/${id}/research`)}>{running ? "Research in progress…" : "RESEARCH EVENT"}</Btn><Btn onClick={() => void act(`/events/${id}/check-now`)}>Check for changes now</Btn></>} />
       </div>
       {msg && <div className="text-xs text-muted">{msg}</div>}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
@@ -86,7 +82,7 @@ export function EventDetail() {
               <dt className="text-muted">Last successful</dt><dd>{fmtTime(data.monitoring.last_success_at) ?? "never"}</dd>
               <dt className="text-muted">Changes detected</dt><dd>{data.monitoring.changes_detected}</dd>
               <dt className="text-muted">Next check</dt><dd>{data.monitoring.enabled ? fmtTime(data.monitoring.next_run_at) : "disabled"}</dd>
-              <dt className="text-muted">Error</dt><dd className="text-red-300">{data.monitoring.last_error ?? "none"}</dd>
+              <dt className="text-muted">Error</dt><dd className={data.monitoring.last_error ? "text-alert" : ""}>{data.monitoring.last_error ?? "none"}</dd>
             </dl>
           ) : <Empty>Monitoring starts after the first successful research.</Empty>}
           <div className="mt-3 flex items-center gap-2 text-xs text-muted">Set frequency:
@@ -96,13 +92,13 @@ export function EventDetail() {
       <Card title={`Research tasks (${(data.tasks as Row[]).length})`}>
         <Table rows={data.tasks} empty="No research has been run." cols={[
           { h: "#", r: (t) => t.id }, { h: "Type", r: (t) => t.type }, { h: "Status", r: (t) => <Badge value={t.status} /> },
-          { h: "Progress / error", r: (t) => <span className={t.error ? "text-red-300" : "text-muted"}>{t.error ?? t.progress_note ?? "—"}</span> },
+          { h: "Progress / error", r: (t) => <span className={t.error ? "text-alert" : "text-muted"}>{t.error ?? t.progress_note ?? "—"}</span> },
           { h: "Attempts", r: (t) => t.attempts }, { h: "Started", r: (t) => fmtTime(t.started_at) ?? "—" },
         ]} />
       </Card>
       <Card title={`Exhibitors (${ex.data?.total ?? 0})`} actions={<input className="!w-56" placeholder="Filter by name" value={q} onChange={(ev) => setQ(ev.target.value)} />}>
         <Table rows={ex.data?.rows ?? []} empty="No exhibitors extracted yet." cols={[
-          { h: "Exhibitor", r: (x) => x.company_id ? <Link className="text-sky-300 hover:underline" to={`/companies/${x.company_id}`}>{x.exhibitor_name}</Link> : x.exhibitor_name },
+          { h: "Exhibitor", r: (x) => x.company_id ? <Link className="text-accent underline-offset-2 hover:underline hover:text-accent" to={`/companies/${x.company_id}`}>{x.exhibitor_name}</Link> : x.exhibitor_name },
           { h: "Country", r: (x) => x.country ?? <Unknown /> }, { h: "Website", r: (x) => x.website ? <ExtLink href={x.website}>{x.website.replace(/^https?:\/\/(www\.)?/, "")}</ExtLink> : <Unknown /> },
           { h: "Stand", r: (x) => x.booth ?? <Unknown /> }, { h: "Identity", r: (x) => <Badge value={x.identity_state ?? (x.resolution_status === "PENDING_DETAIL" ? "PENDING_PROFILE" : "UNKNOWN")} /> },
           { h: "Source", r: (x) => <ExtLink href={x.profile_url ?? x.source_url}>evidence</ExtLink> },

@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 import { useApi } from "../api.ts";
-import { Badge, Card, Empty, Err, Stat, fmtTime } from "../ui.tsx";
+import { Badge, Card, Empty, Err, PageHead, Stat, fmtTime } from "../ui.tsx";
 import type { Row } from "../types.ts";
 
 export function Overview() {
@@ -10,9 +10,9 @@ export function Overview() {
   const nothing = o && o.events.discovered === 0 && o.companies.total === 0 && o.procurement.notices === 0;
   return (
     <div className="space-y-5">
-      <div><h1 className="text-xl font-bold">Overview</h1><p className="text-sm text-muted">Every number is a count of persisted records. Nothing is estimated.</p></div>
+      <PageHead title="Overview" sub="Every number is a count of persisted records. Nothing is estimated." />
       <Err msg={ov.error} />
-      {nothing && <Empty>No data yet. Start with <Link className="text-accent underline" to="/events">Event Intelligence</Link> (add an official event URL) or sync procurement notices in <Link className="text-accent underline" to="/procurement">Procurement Intelligence</Link>.</Empty>}
+      {nothing && <Empty>No data yet. Start with <Link className="text-accent underline-offset-2 hover:underline hover:text-accent" to="/events">Event Intelligence</Link> (add an official event URL) or sync procurement notices in <Link className="text-accent underline-offset-2 hover:underline hover:text-accent" to="/procurement">Procurement Intelligence</Link>.</Empty>}
       {o && (
         <>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -30,7 +30,7 @@ export function Overview() {
           <Card title="Connector health">
             <div className="grid gap-2 md:grid-cols-2">
               {o.connectors.map((c: Row) => (
-                <div key={c.key} className="flex items-center justify-between rounded border border-edge/60 px-3 py-2 text-[13px]">
+                <div key={c.key} className="flex items-center justify-between border border-edge px-3 py-2 text-[13px]">
                   <div><div>{c.name}</div><div className="text-[11px] text-muted">{c.last_success_at ? `Last success ${fmtTime(c.last_success_at)}` : "Never synchronised"}{c.last_error ? ` · ${c.last_error.slice(0, 80)}` : ""}</div></div>
                   <Badge value={c.status} />
                 </div>
@@ -44,8 +44,8 @@ export function Overview() {
           <ul className="space-y-1.5 text-[13px]">
             {feed.data.map((a) => (
               <li key={a.id} className="flex gap-3">
-                <span className="w-36 shrink-0 text-[11px] text-muted">{fmtTime(a.created_at)}</span>
-                <span className="w-40 shrink-0 text-[11px] text-accent">{a.action}</span>
+                <span className="w-40 shrink-0 font-mono text-[11px] text-muted">{fmtTime(a.created_at)}</span>
+                <span className="w-40 shrink-0 font-mono text-[11px] text-accent">{a.action}</span>
                 <span className="min-w-0 flex-1 truncate">{a.summary}</span>
                 <ActivityLink a={a} />
               </li>
@@ -60,6 +60,6 @@ export function Overview() {
 function ActivityLink({ a }: { a: Row }) {
   const map: Record<string, string> = { event: "/events/", company: "/companies/", negotiation: "/negotiations/" };
   const base = map[a.entity_type as string];
-  if (a.entity_type === "task") return <Link to="/agents" className="text-xs text-sky-300">task #{a.entity_id}</Link>;
-  return base && a.entity_id ? <Link to={`${base}${a.entity_id}`} className="text-xs text-sky-300">open</Link> : <span />;
+  if (a.entity_type === "task") return <Link to="/agents" className="text-xs text-accent underline-offset-2 hover:underline hover:text-accent">task #{a.entity_id}</Link>;
+  return base && a.entity_id ? <Link to={`${base}${a.entity_id}`} className="text-xs text-accent underline-offset-2 hover:underline hover:text-accent">open</Link> : <span />;
 }

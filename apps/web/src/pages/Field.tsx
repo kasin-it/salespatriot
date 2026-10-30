@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router";
 import { api, getToken, useApi } from "../api.ts";
-import { Badge, Btn, Card, Empty, Err, Field as F, Table, fmtTime } from "../ui.tsx";
+import { Badge, Btn, Cap, Card, Empty, Err, Field as F, Notice, PageHead, Table, fmtTime } from "../ui.tsx";
 import type { Row } from "../types.ts";
 
 function DealBanner({ dealId }: { dealId: number }) {
@@ -14,11 +14,11 @@ function DealBanner({ dealId }: { dealId: number }) {
     window.open(URL.createObjectURL(await res.blob()), "_blank");
   };
   return (
-    <div className="rounded-lg border border-emerald-500/50 bg-emerald-500/15 p-4">
-      <div className="text-lg font-bold text-emerald-300">DEAL CLOSED{sandbox ? " — SANDBOX SIMULATION" : ""}</div>
-      <div className="mt-1 text-sm">{deal.deal_ref} · {deal.total_value != null ? `${deal.total_value} ${deal.currency}` : "value unknown"} · human approvals: <b>{d.data.humanApprovals}</b></div>
-      {sandbox && <div className="mt-1 text-xs text-amber-200">The supplier side is a simulated agent with an operator-configured mandate. Not a real transaction and not a signed contract.</div>}
-      <div className="mt-2 flex gap-2"><Btn onClick={() => void open()}>Open deal PDF</Btn><Link className="text-xs text-sky-300 underline" to={`/negotiations/${deal.negotiation_id}`}>Negotiation history &amp; ledger</Link></div>
+    <div className="space-y-2">
+      <div className="ds-banner">DEAL CLOSED{sandbox ? " — SANDBOX SIMULATION" : ""}</div>
+      <div className="text-sm">{deal.deal_ref} · {deal.total_value != null ? `${deal.total_value} ${deal.currency}` : "value unknown"} · human approvals: <b>{d.data.humanApprovals}</b></div>
+      {sandbox && <Notice tone="warn">The supplier side is a simulated agent with an operator-configured mandate. Not a real transaction and not a signed contract.</Notice>}
+      <div className="flex items-center gap-2"><Btn onClick={() => void open()}>Open deal PDF</Btn><Link className="text-xs text-accent underline-offset-2 hover:underline hover:text-accent" to={`/negotiations/${deal.negotiation_id}`}>Negotiation history &amp; ledger</Link></div>
     </div>
   );
 }
@@ -39,7 +39,7 @@ export function FieldAgent() {
   if (me.data && !me.data.companies.length) return <Empty>Register a company in Settings to use the Field Agent.</Empty>;
   return (
     <div className="space-y-5">
-      <div><h1 className="text-xl font-bold">Field Agent</h1><p className="text-sm text-muted">The agent writes to a person at the event and asks for a photo, the specification and the product presentation. Everything after the reply is autonomous.</p></div>
+      <PageHead title="Field Agent" sub="The agent writes to a person at the event and asks for a photo, the specification and the product presentation. Everything after the reply is autonomous." />
       <Err msg={msg} />
       <Card title="Setup status">
         <div className="flex flex-wrap gap-4 text-xs"><span>Photo reading (vision): {vision.data?.configured ? <Badge value="CONNECTED" /> : <Badge value="NOT_CONFIGURED" />} {vision.data?.configured && <span className="text-muted">{vision.data.provider} · {vision.data.model}</span>}</span>
@@ -66,22 +66,22 @@ export function FieldAgent() {
           <F label="Stand hint"><input value={f.standHint} onChange={(e) => setF({ ...f, standHint: e.target.value })} placeholder="hall 2, A12" /></F>
           <F label="RFQ quantity"><input value={f.quantity} onChange={(e) => setF({ ...f, quantity: e.target.value })} /></F>
           <F label="Delivery location"><input value={f.deliveryLocation} onChange={(e) => setF({ ...f, deliveryLocation: e.target.value })} /></F>
-          <label className="mt-5 flex items-center gap-2 text-xs md:col-span-2"><input className="!w-auto" type="checkbox" checked={f.auto} onChange={(e) => setF({ ...f, auto: e.target.checked })} />After the reply, negotiate and close autonomously (SANDBOX)</label>
+          <label className="mb-0 mt-5 flex items-center gap-2 font-sans text-xs normal-case text-ink md:col-span-2"><input className="!w-auto" type="checkbox" checked={f.auto} onChange={(e) => setF({ ...f, auto: e.target.checked })} />After the reply, negotiate and close autonomously (SANDBOX)</label>
         </div>
         <div className="mt-3"><Btn tone="primary" disabled={!f.repId} onClick={() => void run(() => api("/field/requests", { body: { companyId, repId: Number(f.repId), eventId: f.eventId ? Number(f.eventId) : undefined, targetCompanyId: f.targetCompanyId ? Number(f.targetCompanyId) : undefined, standHint: f.standHint || undefined, autoNegotiate: f.auto, rfqTerms: { quantity: f.quantity ? Number(f.quantity) : null, deliveryLocation: f.deliveryLocation || null } } }), "Request queued — the agent will email the person")}>Send request</Btn></div>
       </Card>
       {(reqs.data?.rows ?? []).map((r: Row) => (
         <Card key={r.id} title={`Request ${r.token} → ${r.rep_name}`} actions={<Badge value={r.status} />}>
           <div className="space-y-3 text-[13px]">
-            <div className="text-xs text-muted">Sent {fmtTime(r.sent_at) ?? "not sent"} · {r.mode}{r.error ? <span className="text-red-300"> · {r.error}</span> : null}{r.replied_at ? ` · replied ${fmtTime(r.replied_at)}` : " · waiting for the person's reply"}</div>
+            <div className="text-xs text-muted">Sent {fmtTime(r.sent_at) ?? "not sent"} · {r.mode}{r.error ? <span className="text-alert"> · {r.error}</span> : null}{r.replied_at ? ` · replied ${fmtTime(r.replied_at)}` : " · waiting for the person's reply"}</div>
             {r.deal_id && <DealBanner dealId={r.deal_id} />}
-            {r.attachments.length > 0 && <Table rows={r.attachments} cols={[{ h: "File", r: (a) => a.filename }, { h: "Kind", r: (a) => a.kind }, { h: "Reading", r: (a) => <Badge value={a.extraction_status} /> }, { h: "Extracted", r: (a) => a.extracted ? <span className="text-[11px]">{a.extracted.vision?.product_name ? `${a.extracted.vision.product_name} · ` : ""}price {a.extracted.terms.unitPrice ?? "?"} {a.extracted.terms.currency ?? ""} · lead {a.extracted.terms.leadTimeDays ?? "?"} d · certs {a.extracted.certifications.map((c: Row) => c.name).join(", ") || "none"}{a.extracted.vision?.dropped?.length ? <span className="text-amber-200"> · {a.extracted.vision.dropped.length} unverifiable value(s) dropped</span> : null}</span> : "—" }]} />}
+            {r.attachments.length > 0 && <Table rows={r.attachments} cols={[{ h: "File", r: (a) => a.filename }, { h: "Kind", r: (a) => a.kind }, { h: "Reading", r: (a) => <Badge value={a.extraction_status} /> }, { h: "Extracted", r: (a) => a.extracted ? <span className="text-[11px]">{a.extracted.vision?.product_name ? `${a.extracted.vision.product_name} · ` : ""}price {a.extracted.terms.unitPrice ?? "?"} {a.extracted.terms.currency ?? ""} · lead {a.extracted.terms.leadTimeDays ?? "?"} d · certs {a.extracted.certifications.map((c: Row) => c.name).join(", ") || "none"}{a.extracted.vision?.dropped?.length ? <span className="font-medium"> · {a.extracted.vision.dropped.length} unverifiable value(s) dropped</span> : null}</span> : "—" }]} />}
             {r.briefing && (
-              <div className="rounded border border-edge p-3">
-                <div className="mb-1 text-xs uppercase text-muted">Briefing</div>
+              <div className="border border-edge p-3">
+                <Cap>Briefing</Cap>
                 <div>{r.briefing.fit.priceVsMandate} · {r.briefing.fit.leadTimeVsMandate}</div>
-                <div className="text-amber-200/90">Gaps: {r.briefing.fromMaterial.gaps.join("; ") || "none"}</div>
-                <div className="mt-1">Matching open notices: {r.briefing.matchedNotices.length ? r.briefing.matchedNotices.map((n: Row) => <a key={n.id} className="mr-3 text-sky-300 underline" href={n.url} target="_blank" rel="noreferrer noopener">{(n.title ?? "notice").slice(0, 50)}</a>) : "none found"}</div>
+                <div className="my-2"><Notice tone="warn">Gaps: {r.briefing.fromMaterial.gaps.join("; ") || "none"}</Notice></div>
+                <div className="mt-1">Matching open notices: {r.briefing.matchedNotices.length ? r.briefing.matchedNotices.map((n: Row) => <a key={n.id} className="mr-3 text-accent underline-offset-2 hover:underline hover:text-accent" href={n.url} target="_blank" rel="noreferrer noopener">{(n.title ?? "notice").slice(0, 50)}</a>) : "none found"}</div>
                 <div className="mt-1 text-muted">{r.briefing.negotiation.decision}</div>
               </div>
             )}

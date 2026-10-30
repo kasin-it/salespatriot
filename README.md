@@ -73,4 +73,5 @@ ARSENAL_WORKER_CONCURRENCY=10 pnpm --filter @salespatriot/api start   # http://1
 4. **Scenario 2**: pick event + stand → the agent writes "Jesteś na evencie? Sprawdź stoisko…" → same chain.
 - Fallback: *Prepared reply: thermal camera / drone* sends the fixture sets in `apps/api/demo-assets/<set>/` (fictional, watermarked). Replace them with real files for a real run.
 - **Drone demo**: prompt `Find me events where I can source 10 military reconnaissance drones by Q2.` — matches real TED tenders with CPV 35613000 (Unmanned aerial vehicles). Save the *Military drone mandates* profile in Setup first. Attach a photo of the real drone in the *Salesperson's phone* card.
+- **Agent Bidding** (`/bidding`): pick an RFQ and press *Start bidding*. A browser-only simulated reverse auction between fictional agents with randomised prices; the buyer agent awards on price, delivery and reliability. Nothing is persisted.
 - The supplier side is always a SANDBOX simulated agent with the operator's mandate; real public companies are never impersonated and the deal is not a signed contract.

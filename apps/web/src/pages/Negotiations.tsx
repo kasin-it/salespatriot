@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { api, ApiError, useApi } from "../api.ts";
-import { Badge, Btn, Card, Empty, Err, Field, Table, fmtTime } from "../ui.tsx";
+import { Badge, Btn, Card, Empty, Err, Field, Notice, PageHead, Table, fmtTime } from "../ui.tsx";
 import type { Row } from "../types.ts";
 
 const TERM_FIELDS: [string, string, "number" | "text"][] = [["unitPrice", "Unit price", "number"], ["currency", "Currency (3 letters)", "text"], ["quantity", "Quantity", "number"], ["moq", "MOQ", "number"], ["deliveryTerms", "Delivery terms", "text"], ["deliveryLocation", "Delivery location", "text"], ["leadTimeDays", "Lead time (days)", "number"], ["paymentTerms", "Payment terms", "text"], ["warranty", "Warranty", "text"], ["validUntil", "Valid until (ISO date-time)", "text"], ["technicalSpecs", "Technical specs", "text"]];
@@ -17,7 +17,7 @@ export function Negotiations() {
   const mine = (me.data?.companies ?? []) as Row[];
   return (
     <div className="space-y-5">
-      <div><h1 className="text-xl font-bold">Negotiation Room</h1><p className="text-sm text-muted">Structured, versioned offers. REAL negotiations require both companies to hold authorised accounts. SANDBOX uses public company records and never counts as business.</p></div>
+      <PageHead title="Negotiation Room" sub="Structured, versioned offers. REAL negotiations require both companies to hold authorised accounts. SANDBOX uses public company records and never counts as business." />
       {mine.length === 0 && <Empty>Register your company in Settings first. Only authorised companies can negotiate.</Empty>}
       <Card title="Start a negotiation">
         <div className="grid gap-3 md:grid-cols-5">
@@ -68,11 +68,10 @@ export function NegotiationRoom() {
   };
   return (
     <div className="space-y-5">
-      <div><Link to="/negotiations" className="text-xs text-muted">← Negotiations</Link>
-        <h1 className="text-xl font-bold">{n.subject} <Badge value={n.state} /> <Badge value={n.mode} /></h1>
-        {n.mode === "SANDBOX" && <div className="mt-1 rounded border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-200">SANDBOX: a simulated workflow on public company records. Offers, acceptance and any resulting deal are NOT real commercial events and are excluded from business reporting.</div>}
-        <div className="text-sm text-muted">Round {n.round} · {data.deal ? `Deal ${data.deal.deal_ref}` : "no deal yet"}</div></div>
-      {msg && <div className="rounded border border-edge bg-panel p-2 text-sm">{msg}</div>}
+      <div className="space-y-2"><Link to="/negotiations" className="text-xs text-accent underline-offset-2 hover:underline hover:text-accent">← Negotiations</Link>
+        <PageHead title={<>{n.subject} <Badge value={n.state} /> <Badge value={n.mode} /></>} sub={<>Round {n.round} · {data.deal ? `Deal ${data.deal.deal_ref}` : "no deal yet"}</>} />
+        {n.mode === "SANDBOX" && <Notice tone="warn">SANDBOX: a simulated workflow on public company records. Offers, acceptance and any resulting deal are NOT real commercial events and are excluded from business reporting.</Notice>}</div>
+      {msg && <div className="border border-edge bg-paper p-2 text-sm">{msg}</div>}
       <Card title="Offer history (versioned; each counter references the previous version)">
         <Table rows={offers} empty="No offers yet. The buyer starts with an RFQ." cols={[
           { h: "v", r: (o) => o.version }, { h: "Kind", r: (o) => o.kind }, { h: "From", r: (o) => (o.from_company_id === n.buyer_company_id ? "Buyer" : "Supplier") }, { h: "Refs", r: (o) => (o.previous_offer_id ? `v${offers.find((x) => x.id === o.previous_offer_id)?.version}` : "—") },
@@ -86,7 +85,7 @@ export function NegotiationRoom() {
         <Card title={`Submit offer as ${company.name} (${side})`} actions={<div className="flex gap-2"><Btn onClick={() => void call(`/negotiations/${id}/agent-step`, { companyId: company.id })}>Let my agent respond</Btn><Btn tone="primary" onClick={() => void autopilot()}>AUTOPILOT: negotiate &amp; close (no human)</Btn></div>}>
           <div className="mb-3 flex flex-wrap gap-3 text-xs">
             <select className="!w-48" value={kind} onChange={(e) => setKind(e.target.value)}>{side === "BUYER" ? <option value="rfq">RFQ</option> : <option value="quotation">Quotation</option>}<option value="counter">Counteroffer</option></select>
-            <label className="flex items-center gap-2"><input className="!w-auto" type="checkbox" checked={recorded} onChange={(e) => setRecorded(e.target.checked)} />Record an offer the counterparty actually sent me</label>
+            <label className="mb-0 flex items-center gap-2 font-sans normal-case text-ink"><input className="!w-auto" type="checkbox" checked={recorded} onChange={(e) => setRecorded(e.target.checked)} />Record an offer the counterparty actually sent me</label>
           </div>
           <div className="grid gap-3 md:grid-cols-4">{TERM_FIELDS.map(([k, label]) => <Field key={k} label={label}><input value={terms[k] ?? ""} onChange={(e) => setTerms({ ...terms, [k]: e.target.value })} /></Field>)}</div>
           <div className="mt-3 flex gap-2">

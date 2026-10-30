@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api, useApi } from "../api.ts";
-import { Badge, Btn, Card, Err, ExtLink, Field, Stat, Table, Unknown, fmtDate, fmtTime, parseList } from "../ui.tsx";
+import { Badge, Btn, Card, Err, ExtLink, Field, PageHead, Table, Unknown, fmtDate, fmtTime, parseList } from "../ui.tsx";
 import type { Row } from "../types.ts";
 
 const SOURCE_LABEL: Record<string, string> = { ted: "TED — Official API", ezamowienia: "e-Zamówienia — Official API", manual: "Manually imported" };
@@ -21,13 +21,13 @@ export function Procurement() {
   const proc = (conns.data ?? []).filter((c) => c.kind.startsWith("procurement"));
   return (
     <div className="space-y-5">
-      <div><h1 className="text-xl font-bold">Procurement Intelligence</h1><p className="text-sm text-muted">Real notices from official sources. Missing metadata stays empty. A notice is an opportunity, not proof that anyone wants to trade with you.</p></div>
+      <PageHead title="Procurement Intelligence" sub="Real notices from official sources. Missing metadata stays empty. A notice is an opportunity, not proof that anyone wants to trade with you." />
       <Card title="Source coverage" actions={<Btn onClick={() => conns.reload()}>Refresh</Btn>}>
         <Table rows={proc} cols={[
           { h: "Source", r: (c) => <div><div className="font-medium">{c.name}</div><div className="text-[11px] text-muted">{c.endpoint}</div></div> }, { h: "Status", r: (c) => <Badge value={c.status} /> },
           { h: "Access", r: (c) => c.access_method }, { h: "Notices stored", r: (c) => c.records_total }, { h: "Last attempt", r: (c) => fmtTime(c.last_attempt_at) ?? "never" }, { h: "Last success", r: (c) => fmtTime(c.last_success_at) ?? "never" },
           { h: "New / updated (last run)", r: (c) => `${c.last_new} / ${c.last_updated}` }, { h: "Failed requests", r: (c) => c.failed_requests }, { h: "Rate limit", r: (c) => c.rate_limit ?? "—" },
-          { h: "Known limitations", r: (c) => <div className="max-w-xs text-[11px] text-amber-200/80">{c.coverage_notes}{c.last_error && <div className="text-red-300">Last error: {c.last_error.slice(0, 120)}</div>}</div> },
+          { h: "Known limitations", r: (c) => <div className="max-w-xs border-l-2 border-ink pl-2 text-[11px] text-ink">{c.coverage_notes}{c.last_error && <div className="text-alert">Last error: {c.last_error.slice(0, 120)}</div>}</div> },
         ]} />
         <div className="mt-4 flex flex-wrap items-end gap-2">
           <Field label="TED filter"><select value={tedFilter} onChange={(e) => setTedFilter(e.target.value)}>{(filters.data?.ted ?? []).map((t: Row) => <option key={t.key} value={t.key}>{t.label}</option>)}</select></Field>
@@ -35,10 +35,10 @@ export function Procurement() {
           <Btn onClick={() => void sync({ source: "ezamowienia", days: 2 })}>Sync e-Zamówienia (last 2 days)</Btn>
           {msg && <span className="text-xs text-muted">{msg}</span>}
         </div>
-        <Table rows={jobs.data?.slice(0, 5) ?? []} cols={[{ h: "Job", r: (j) => `#${j.id} ${j.connector_key}` }, { h: "Status", r: (j) => <Badge value={j.status} /> }, { h: "Fetched", r: (j) => j.fetched }, { h: "New", r: (j) => j.created }, { h: "Updated", r: (j) => j.updated }, { h: "Failed", r: (j) => j.failed }, { h: "Started", r: (j) => fmtTime(j.started_at) }, { h: "Error", r: (j) => <span className="text-red-300">{j.error?.slice(0, 80)}</span> }]} />
+        <Table rows={jobs.data?.slice(0, 5) ?? []} cols={[{ h: "Job", r: (j) => `#${j.id} ${j.connector_key}` }, { h: "Status", r: (j) => <Badge value={j.status} /> }, { h: "Fetched", r: (j) => j.fetched }, { h: "New", r: (j) => j.created }, { h: "Updated", r: (j) => j.updated }, { h: "Failed", r: (j) => j.failed }, { h: "Started", r: (j) => fmtTime(j.started_at) }, { h: "Error", r: (j) => <span className="text-alert">{j.error?.slice(0, 80)}</span> }]} />
       </Card>
       <Card title="Contracting authority mappings (via TED)">
-        <Table rows={auth.data ?? []} cols={[{ h: "Authority", r: (a) => a.display_name }, { h: "Notices in database", r: (a) => <Stat label="" value={a.noticesInDatabase} /> }, { h: "Latest publication", r: (a) => fmtDate(a.lastPublication) ?? <Unknown label="none retrieved" /> }, { h: "Direct source", r: (a) => <Badge value={a.direct_source_status} tone="amber" /> }, { h: "Coverage note", r: (a) => <span className="text-[12px] text-amber-200/80">{a.coverage_note}</span> }]} />
+        <Table rows={auth.data ?? []} cols={[{ h: "Authority", r: (a) => a.display_name }, { h: "Notices in database", r: (a) => <span className="font-mono">{a.noticesInDatabase}</span> }, { h: "Latest publication", r: (a) => fmtDate(a.lastPublication) ?? <Unknown label="none retrieved" /> }, { h: "Direct source", r: (a) => <Badge value={a.direct_source_status} tone="amber" /> }, { h: "Coverage note", r: (a) => <span className="block border-l-2 border-ink pl-2 text-[12px] text-ink">{a.coverage_note}</span> }]} />
       </Card>
       <Card title="Search notices">
         <div className="grid gap-3 md:grid-cols-6">
@@ -58,7 +58,7 @@ export function Procurement() {
           { h: "CPV", r: (n) => { const c = parseList(n.cpv_codes); return c.length ? c.slice(0, 3).join(", ") + (c.length > 3 ? "…" : "") : <Unknown label="Not published" />; } },
           { h: "Demand", r: (n) => <Badge value={n.demand_class} /> },
           { h: "Completeness", r: (n) => `${Math.round(n.data_completeness * 100)}%` },
-          { h: "Source", r: (n) => <div className="text-[11px]">{SOURCE_LABEL[n.source_key] ?? n.source_key}{parseList(n.authority_tags).length ? <div className="text-amber-200/80">Retrieved through TED (mapped: {parseList(n.authority_tags).join(", ")})</div> : null}</div> },
+          { h: "Source", r: (n) => <div className="text-[11px]">{SOURCE_LABEL[n.source_key] ?? n.source_key}{parseList(n.authority_tags).length ? <div className="mt-1 border-l-2 border-ink pl-2 text-ink">Retrieved through TED (mapped: {parseList(n.authority_tags).join(", ")})</div> : null}</div> },
         ]} />
       </Card>
       {sel && (
@@ -70,7 +70,7 @@ export function Procurement() {
             <dt className="text-muted">Missing fields</dt><dd>{parseList(sel.missing_fields).join(", ") || "none"}</dd>
             <dt className="text-muted">Matching suppliers</dt><dd>{(sel.matches as Row[]).length ? (sel.matches as Row[]).map((m) => `${m.supplier} (${m.status}, ${m.score})`).join("; ") : <Unknown label="none" />}</dd>
           </dl>
-          <details className="mt-3 text-xs"><summary className="cursor-pointer text-muted">Original payload (audit)</summary><pre className="mt-2 max-h-72 overflow-auto rounded bg-black/40 p-2">{JSON.stringify(sel.original_payload, null, 1)}</pre></details>
+          <details className="mt-3 text-xs"><summary className="cursor-pointer text-muted">Original payload (audit)</summary><pre className="mt-2 max-h-72 overflow-auto bg-mist p-2 font-mono">{JSON.stringify(sel.original_payload, null, 1)}</pre></details>
         </Card>
       )}
     </div>
