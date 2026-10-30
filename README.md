@@ -27,10 +27,12 @@ Event-driven intelligence and marketplace for the European defence/industrial su
 | --- | --- | --- |
 | API + worker + scheduler | `apps/api` | Node 25, Hono, built-in `node:sqlite` (WAL, FTS5), zod |
 | Web UI | `apps/web` | React 19, React Router, Tailwind 4, Vite |
-| MCP server for Claude Desktop | `apps/mcp` | `@modelcontextprotocol/sdk` (stdio) |
+| MCP server for Claude Desktop | `apps/mcp` | `@modelcontextprotocol/sdk` (stdio), `@modelcontextprotocol/ext-apps` + Vite (inline explorer UI; run `pnpm --filter @salespatriot/mcp build` before connecting) |
 | Shared vocabulary | `packages/shared` | TypeScript |
 
 ## Run
+
+Demo data: `pnpm --filter @salespatriot/api seed:mock` adds fictional `[MOCK]` events; append `--remove` to delete them.
 
 ```sh
 pnpm install
