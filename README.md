@@ -67,6 +67,15 @@ pnpm install && pnpm --filter @salespatriot/web build
 ARSENAL_WORKER_CONCURRENCY=10 pnpm --filter @salespatriot/api start   # http://127.0.0.1:8787
 ```
 
+**Quick setup with the shared data** (instead of steps 1–2 below):
+```sh
+pnpm --filter @salespatriot/api seed:snapshot                         # ~1 min: 21,017 TED + e-Zamówienia rows from seed/snapshot (pulled 29–30 Oct 2026)
+DEMO_PASSWORD=<any local password> pnpm --filter @salespatriot/api seed:demo   # server must be running: demo@arsenal.test, mandates, salesperson, 3 events
+```
+The snapshot is real public data (TED v3 API, e-Zamówienia API); each notice keeps its source link. Exhibitor profiles still load in the background after `seed:demo` (~15–20 min).
+
+**Claude Desktop (MCP):** add `apps/mcp/src/server.ts` to `claude_desktop_config.json` with `ARSENAL_API_URL` and an `ARSENAL_API_TOKEN` from `POST /api/tokens` (scopes `read`, `write`). Use the full path to Node 24 as `command` (Desktop doesn't load nvm). Then ask Claude to source a product, or pick the `source_product` prompt.
+
 1. Register in the UI, open **Mission Control → Setup** once (your company, buyer mandate, *simulated* supplier mandate, salesperson email).
 2. Add the events (`Events → Add event by URL`, e.g. `https://www.enforcetac.com/en`, `https://www.targikielce.pl/en/mspo`). Research reads exhibitor profiles at ~1 request/s per site (~15–20 min for the full lists) — do this before the show.
 3. **Scenario 1**: type the request (or click a chip) → ranking → top-3 stands → email to the salesperson → *Salesperson's phone* card (or any mail client replying to the same subject) → photo/spec parsed → briefing → buyer/supplier agents negotiate by email → **DEAL CLOSED** (PDF, ledger, human approvals: 0).
